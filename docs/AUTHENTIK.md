@@ -73,12 +73,34 @@ weiter gefragt.
 Abmelden, `https://buchhaltung.nak-inf.de/login` öffnen — dort erscheint ein Button
 für den Provider. Login muss nach Authentik und zurück führen.
 
-## Wichtig: der Administrator bleibt
+## Nur SSO, kein Passwort-Login
 
-Der lokale `Administrator`-Account ist der Notausgang, wenn Authentik oder die
-OIDC-Konfiguration kaputt ist. Er wird **nicht** gelöscht und sein Passwort gehört in
-den Vaultwarden der Fachschaft. Erreichbar bleibt er über
-`https://buchhaltung.nak-inf.de/login` (Benutzername `Administrator`).
+In den System Settings ist gesetzt:
+
+```
+disable_user_pass_login = 1   # kein Benutzername/Passwort mehr
+login_with_email_link   = 0   # kein Magic-Link-Login
+```
+
+Die Login-Seite bietet damit ausschließlich den Authentik-Button. Das ist Absicht:
+ein zweiter, schwächerer Anmeldeweg neben dem SSO ist genau die Lücke, die man sich
+sonst offen lässt.
+
+**Preis dafür — der Notausgang liegt jetzt auf der Shell.** Wenn Authentik ausfällt
+oder die OIDC-Konfiguration kaputtgeht, kommt *niemand* mehr über den Browser rein,
+auch der `Administrator` nicht. Wiederherstellung dann über den Container:
+
+```bash
+# auf slipknot (10.0.0.200), Root-Shell dort ist fish -> Skript ueber bash -s
+CT=$(docker ps --filter name=backend-vlypchwxzmqzlzyznd3ovf0m -q | head -1)
+docker exec "$CT" bench --site buchhaltung.nak-inf.de \
+  set-config -p disable_user_pass_login 0
+docker exec "$CT" bench --site buchhaltung.nak-inf.de set-admin-password '<neues-passwort>'
+```
+
+Danach ist der Passwort-Login wieder da und der `Administrator` nutzbar. Sein Passwort
+steht in den Coolify-Environment-Variables unter `ADMIN_PASSWORD` und gehört zusätzlich
+in den Vaultwarden der Fachschaft.
 
 ## Rollen
 
