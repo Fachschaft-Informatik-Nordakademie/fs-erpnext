@@ -14,6 +14,12 @@ x-frappe: &frappe
   image: "${FRAPPE_IMAGE:-frappe/erpnext}:${FRAPPE_VERSION:-v16.35.0}"
   restart: unless-stopped
   networks: [frappe]
+  # mango kann kein NAT-Hairpin: ein Container, der portal.nak-studis.de ueber die
+  # oeffentliche IP aufloest, laeuft ins Leere. Der OIDC-Token-Tausch passiert aber
+  # server-zu-server aus dem backend-Container heraus. Deshalb der Kurzschluss auf
+  # NPMplus im LAN - TLS bleibt gueltig, weil NPMplus per SNI dasselbe Zertifikat liefert.
+  extra_hosts:
+    - "portal.nak-studis.de:${AUTHENTIK_LAN_IP:-10.0.0.100}"
   volumes:
     - sites:/home/frappe/frappe-bench/sites
     - logs:/home/frappe/frappe-bench/logs
