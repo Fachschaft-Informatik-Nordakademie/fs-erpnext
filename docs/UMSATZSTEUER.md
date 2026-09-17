@@ -36,7 +36,7 @@ Image enthalten ist. Sie muss ins Image gebaut werden:
 3. Redeploy. **Achtung:** `create-site` überspringt eine bereits existierende Site — die
    neue App muss dann einmalig nachinstalliert werden:
    ```
-   bench --site buchhaltung.nak-inf.de install-app erpnext_datev
+   bench --site erp.nak-studis.de install-app erpnext_datev
    ```
    (im `backend`-Container ausführen)
 4. In ERPNext unter **Datev Settings** die Beraternummer und Mandantennummer eintragen,

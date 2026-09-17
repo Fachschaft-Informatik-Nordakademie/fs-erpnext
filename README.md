@@ -38,7 +38,7 @@ Beide Wege sind vorbereitet, siehe [docs/UMSATZSTEUER.md](docs/UMSATZSTEUER.md).
 | Server | **slipknot** (VM 200, 10.0.0.200) — dort laufen auch die beiden Firefly-III-Instanzen |
 | Host-Port | `5010` (belegt auf slipknot: 3000, 5006, 5007, 5678, 8000, 9000, 9001) |
 | Ingress | NPMplus auf rammstein (10.0.0.100) → `10.0.0.200:5010` |
-| Domain | `buchhaltung.nak-inf.de` |
+| Domain | `erp.nak-studis.de` |
 
 Routing läuft wie bei den anderen Diensten auf slipknot über NPMplus, nicht über
 Coolifys Traefik — deshalb veröffentlicht der `frontend`-Service seinen Port auf den Host.

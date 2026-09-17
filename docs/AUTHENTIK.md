@@ -14,7 +14,7 @@ Authentik läuft bei uns auf **portal.nak-studis.de** (rammstein, VM 100).
 |---|---|
 | Name | `ERPNext Buchhaltung` |
 | Client type | `Confidential` |
-| Redirect URI | `https://buchhaltung.nak-inf.de/api/method/frappe.integrations.oauth2_logins.custom/authentik` |
+| Redirect URI | `https://erp.nak-studis.de/api/method/frappe.integrations.oauth2_logins.custom/authentik` |
 | Signing Key | ein Signing-Zertifikat auswählen (sonst kommt kein `id_token`) |
 | Scopes | `openid`, `email`, `profile` |
 
@@ -70,7 +70,7 @@ weiter gefragt.
 
 ## 4. Prüfen
 
-Abmelden, `https://buchhaltung.nak-inf.de/login` öffnen — dort erscheint ein Button
+Abmelden, `https://erp.nak-studis.de/login` öffnen — dort erscheint ein Button
 für den Provider. Login muss nach Authentik und zurück führen.
 
 ## Nur SSO, kein Passwort-Login
@@ -93,9 +93,9 @@ auch der `Administrator` nicht. Wiederherstellung dann über den Container:
 ```bash
 # auf slipknot (10.0.0.200), Root-Shell dort ist fish -> Skript ueber bash -s
 CT=$(docker ps --filter name=backend-vlypchwxzmqzlzyznd3ovf0m -q | head -1)
-docker exec "$CT" bench --site buchhaltung.nak-inf.de \
+docker exec "$CT" bench --site erp.nak-studis.de \
   set-config -p disable_user_pass_login 0
-docker exec "$CT" bench --site buchhaltung.nak-inf.de set-admin-password '<neues-passwort>'
+docker exec "$CT" bench --site erp.nak-studis.de set-admin-password '<neues-passwort>'
 ```
 
 Danach ist der Passwort-Login wieder da und der `Administrator` nutzbar. Sein Passwort
