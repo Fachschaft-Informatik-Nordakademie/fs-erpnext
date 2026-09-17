@@ -20,6 +20,13 @@ Authentik läuft bei uns auf **portal.nak-studis.de** (rammstein, VM 100).
 
 Client ID und Secret werden dabei erzeugt — beide gleich notieren.
 
+**Grant Types nicht vergessen.** Unter *Advanced protocol settings* muss
+`authorization_code` (und sinnvollerweise `refresh_token`) in **Grant types** stehen.
+Authentik 2026.8 pflegt diese Liste pro Provider, und beim Anlegen über die API bleibt
+sie **leer** — die Anmeldung scheitert dann mit `invalid_request` /
+„The request is otherwise malformed", was im ERPNext-Callback als HTTP 500 ankommt.
+Im Authentik-Log steht der eigentliche Grund: `Invalid grant_type for provider`.
+
 **Application** anlegen, den Provider zuweisen, Slug z. B. `erpnext`.
 
 **Zugriff beschränken:** unter *Policy / Group / User Bindings* eine Bindung auf eine
@@ -47,7 +54,21 @@ unter `ADMIN_PASSWORD`), dann **Integrations → Social Login Key → + New**:
 Der Slug hinter `.../oauth2_logins.custom/` in der Redirect URI muss zum Namen des
 Social Login Key passen — heißt der Key `authentik`, lautet die URI wie oben.
 
-## 3. Prüfen
+## 3. Benutzer anlegen
+
+Zwei Dinge müssen zusammenpassen:
+
+1. Der Account ist in Authentik **Mitglied der Gruppe `buchhaltung`** — sonst blockt
+   das Policy-Binding den Zugriff auf die Application.
+2. In ERPNext existiert ein **User mit derselben E-Mail-Adresse**. Frappe ordnet den
+   SSO-Login über die Mailadresse aus dem `userinfo`-Endpoint zu. Der Provider läuft
+   deshalb mit `sub_mode = user_email`.
+
+Neue Person: in Authentik der Gruppe hinzufügen, in ERPNext unter **Users** anlegen
+(User Type `System User`, Rolle siehe unten), fertig — beim ersten Login wird nichts
+weiter gefragt.
+
+## 4. Prüfen
 
 Abmelden, `https://buchhaltung.nak-inf.de/login` öffnen — dort erscheint ein Button
 für den Provider. Login muss nach Authentik und zurück führen.

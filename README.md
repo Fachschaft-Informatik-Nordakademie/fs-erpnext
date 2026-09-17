@@ -73,6 +73,19 @@ backend:
 `create-site` läuft bei jedem Deploy, prüft `sites/<SITE_NAME>` und beendet sich mit 0,
 wenn nichts zu tun ist. Damit ist der Stack idempotent redeploybar.
 
+## Drei Fallen, die beim Aufbau Zeit gekostet haben
+
+1. **`${VAR:?meldung}` niemals in der Compose-Datei.** Coolify parst die Datei beim
+   Anlegen der Ressource und übernimmt die *Fehlermeldung als Default-Wert*. Ergebnis
+   war eine Site namens „SITE_NAME fehlt". Pflichtfelder prüft jetzt `create-site`.
+2. **Das Docker-Netz `coolify` muss auf dem Zielserver existieren.** Coolify-*Services*
+   bekommen je ein eigenes Netz, Coolify-*Applications* nutzen das Destination-Netz
+   `coolify`. Auf slipknot gab es das nie → `network coolify not found`.
+   Fix: `docker network create --attachable coolify`.
+3. **Coolify-Env-API:** `POST /applications/{uuid}/envs` mit `is_literal`/`is_preview`/
+   `is_build_time` gibt 422 — nur `{key, value}` senden. PATCH aktualisiert, POST legt
+   sonst stille Duplikate an.
+
 ## Warum kein `latest`
 
 `FRAPPE_VERSION` ist auf eine exakte Version gepinnt. Ein floating `latest` hat uns bei
