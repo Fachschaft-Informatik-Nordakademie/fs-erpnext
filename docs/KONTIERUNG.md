@@ -1,61 +1,100 @@
-# Kontierung: Events, Eventreihen, Belege
+# Kontierung: Struktur der Instanz
 
-## Events und Eventreihen = Kostenstellenbaum
+Stand: 18.09.2026. Company **Studierendenschaft der NORDAKADEMIE e.V.** (Kürzel `StuPa`),
+Kontenrahmen **SKR04 mit Kontonummern**, Geschäftsjahr **Kalenderjahr**.
 
-ERPNext kennt Kostenstellen als **Baum**. Genau darauf werden die beiden gewünschten
-Auswertungsebenen abgebildet:
+## Eine Company, Fachschaften als Kostenstellen
+
+Der StuPa e.V. ist **eine** Rechtsperson — die Fachschaften wirtschaften eigenständig,
+gehören aber offiziell alle dazu. Deshalb: eine Company, ein Kontenrahmen, ein
+Jahresabschluss. Die Trennung passiert über den Kostenstellenbaum.
 
 ```
-Fachschaft Informatik e.V.
-├── Verwaltung
-├── Ersti-Woche                 <- Eventreihe
-│   ├── Ersti-Party 2026        <- einzelnes Event
-│   ├── Campus-Rallye 2026
-│   └── Ersti-Frühstück 2026
-├── LAN-Party                   <- Eventreihe
-│   ├── LAN Sommer 2026
-│   └── LAN Winter 2026
-└── Merch
+Studierendenschaft der NORDAKADEMIE e.V.
+├── Main                              (Vorgabe von ERPNext)
+└── Fachschaft Informatik
+    ├── Veranstaltungen
+    │   ├── CineNAK
+    │   │   └── CineNAK allgemein
+    │   ├── Brettspieltreff
+    │   │   └── Brettspieltreff allgemein
+    │   └── LAN-Party
+    │       └── LAN-Party allgemein
+    ├── Laufende Kosten
+    │   ├── Server
+    │   └── Domains
+    └── Team Claudia
 ```
 
-Anlegen unter **Accounting → Cost Center**. Die Reihen sind *Group*-Knoten, die
-einzelnen Events sind Blätter — nur auf Blätter wird gebucht.
+**Gebucht wird nur auf Blätter.** Gruppenknoten (Eventreihen, „Veranstaltungen",
+„Laufende Kosten", „Fachschaft Informatik") summieren nur.
 
-**Auswertung:** *Profit and Loss Statement* mit Filter auf eine Kostenstelle.
-Auf einem Blatt steht der Gewinn eines Events, auf einem Gruppenknoten summiert
-ERPNext die ganze Reihe. Genau die zwei Ebenen, ohne Zusatzarbeit.
+Jede Reihe hat ein Blatt `… allgemein` für Kosten, die zur Reihe gehören, aber zu keinem
+einzelnen Termin — etwa ein Beamer für CineNAK oder Spiele für den Brettspieltreff.
+**Einzelne Termine kommen als weitere Blätter daneben**, z. B. `LAN-Party Winter 2026`.
 
-Ein Event ist damit **keine** eigene Kontenreihe — die Konten bleiben schlank
-(Einnahmen Veranstaltungen, Bewirtung, Raummiete, …), und die Zuordnung passiert über
-die Kostenstelle. Das skaliert auch bei 30 Events im Jahr.
+**Auswertung:** *Accounting → Profit and Loss Statement*, Filter auf die Kostenstelle.
+Auf einem Blatt steht das Ergebnis eines Termins, auf `CineNAK` die ganze Reihe, auf
+`Fachschaft Informatik` die komplette Fachschaft, ohne Filter der ganze Verein.
 
-## Belege
+## Laufende Kosten
 
-Jede Buchung (Purchase Invoice, Journal Entry, Payment Entry) hat rechts oben
-**Attachments**. Rechnung als PDF oder Foto dort anhängen — der Beleg hängt damit
-dauerhaft am Vorgang, nicht in einem separaten Ordner.
+`Server` und `Domains` sind angelegt, aber ohne Beträge — sie füllen sich, sobald die
+ersten echten Rechnungen kommen. Bewusst **kein Budget** hinterlegt: ein Budget von 0 €
+würde ERPNext bei jeder Buchung warnen oder blockieren.
 
-Die Anhänge liegen im Docker-Volume `sites`. Das gehört ins Backup — ein reiner
-Datenbank-Dump verliert alle Belege.
+Als Aufwandskonto passt `6495 - Wartungskosten f. Hard- und Software`.
+
+## Team Claudia
+
+Mitglieder zahlen **21,04 € pro Monat** für einen Platz in der Claude-Organisation.
+Modelliert als normaler Verkaufsvorgang, weil das die einzige Variante ist, bei der
+ERPNext offene Posten kennt:
+
+| Objekt | Wert |
+|---|---|
+| Artikel | `TEAM-CLAUDIA-MONAT` — „Team Claudia - Monatsbeitrag" |
+| Preis | 21,04 € (Standard Selling) |
+| Ertragskonto | `4400 - Erlöse 19 % USt` |
+| Kostenstelle | `Team Claudia` |
+| Kundengruppe | `Team Claudia` |
+| Abo-Plan | `Team Claudia Monatsbeitrag`, monatlich |
+| Steuervorlage | `Team Claudia - 19 Prozent im Preis enthalten` |
+
+**Ein Mitglied aufnehmen:** Customer anlegen (Kundengruppe `Team Claudia`) → Subscription
+mit dem Abo-Plan anlegen. ERPNext erzeugt daraus jeden Monat automatisch eine
+Ausgangsrechnung.
+
+**Wer noch zahlen muss:** *Accounting → Accounts Receivable*, Filter Kundengruppe
+`Team Claudia`. Der Bericht zeigt je Mitglied den offenen Betrag und das Alter der
+Forderung. Für Erinnerungen gibt es *Dunning* — das braucht aber ein eingerichtetes
+Postfach, siehe offene Punkte im README.
+
+**Offene Frage an die Steuerberatung:** Die 21,04 € sind hier als **Bruttobetrag mit
+19 % Umsatzsteuer** angelegt (USt ist im Preis enthalten, Rechnungssumme bleibt exakt
+21,04 €). Das Weiterreichen von Softwareplätzen an Mitglieder ist ein Leistungsaustausch
+und damit steuerbar. Sollte eure Steuerberatung das anders sehen, ist es ein Ein-Feld-Fix
+in der Steuervorlage.
+
+## Umsatzsteuer
+
+ERPNexts deutsche Voreinstellung hatte die Company auf **Kleinunternehmer** gesetzt
+(`4185 Erlöse aus Kleinunternehmer § 19 UStG`) und ein falsches Forderungskonto
+(`3250 Erhaltene Anzahlungen`). Beides wurde korrigiert auf `4400 - Erlöse 19 % USt`
+und `1200 - Forderungen aus Lieferungen und Leistungen`.
+
+Das ist wichtig: Der Verein liegt mit über 25.000 € Mitgliedsbeiträgen **über** der
+Kleinunternehmergrenze. Wäre die Vorgabe geblieben, wären alle Erlöse auf dem
+Kleinunternehmerkonto gelandet und die Voranmeldung wäre unbrauchbar gewesen.
+
+Steuerkonten aus dem SKR04: `3806` USt 19 %, `3801` USt 7 %, `1406` Vorsteuer 19 %,
+`1401` Vorsteuer 7 %.
 
 ## Abschreibungen
 
-Wirtschaftsgüter über **800 € netto** (GWG-Grenze, 2026 unverändert) dürfen nicht sofort
-als Ausgabe gebucht werden, sondern werden über die Nutzungsdauer abgeschrieben.
-In ERPNext: **Assets → Asset**, Anlagegut mit Kaufdatum, Nutzungsdauer und
-Abschreibungsmethode anlegen — ERPNext erzeugt daraus den Abschreibungsplan und bucht
-die AfA automatisch.
+Wirtschaftsgüter über **800 € netto** (GWG-Grenze, 2026 unverändert) werden nicht sofort
+als Ausgabe gebucht, sondern über **Assets → Asset** als Anlagegut mit Nutzungsdauer
+erfasst. ERPNext erzeugt daraus den Abschreibungsplan und bucht die AfA automatisch —
+dafür muss der Scheduler laufen, er ist aktiviert.
 
-Alles unter 800 € netto: normale Ausgabe, kein Anlagegut.
-
-## Kontenrahmen
-
-ERPNext bringt SKR03/SKR04 mit (`alyf-de/SKR04`). SKR42, der seit 2025 der
-Vereins-Kontenrahmen der DATEV ist, ist **nicht** enthalten — er bildet die vier
-steuerlichen Tätigkeitsbereiche über Kostenstellen ab. Für diesen Verein ist das
-irrelevant, weil er nicht gemeinnützig ist und die Sphärentrennung damit entfällt.
-Die Kostenstellen stehen deshalb vollständig für Events zur Verfügung.
-
-Sollte der Verein später die Gemeinnützigkeit anstreben, braucht es eine zweite
-Dimension — dann: *Accounting Dimension* „Tätigkeitsbereich" anlegen und die
-Kostenstellen weiter für Events nutzen.
+Alles darunter: normale Ausgabe.
