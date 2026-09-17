@@ -4,6 +4,11 @@
 #
 # Das Image ist bewusst auf eine exakte Version gepinnt (kein :latest).
 # Siehe README.md -> "Warum kein latest".
+#
+# WICHTIG: keine ${VAR:?meldung}-Syntax verwenden. Coolify parst diese Datei beim
+# Anlegen der Ressource und uebernimmt die Fehlermeldung als Default-WERT der
+# Variable - man bekommt dann z.B. eine Site namens "SITE_NAME fehlt".
+# Pflichtvariablen werden stattdessen in create-site geprueft.
 
 x-frappe: &frappe
   image: "${FRAPPE_IMAGE:-frappe/erpnext}:${FRAPPE_VERSION:-v16.35.0}"
@@ -26,7 +31,7 @@ services:
       - --skip-character-set-client-handshake
       - --innodb-buffer-pool-size=256M
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD fehlt}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
     healthcheck:
@@ -78,14 +83,18 @@ services:
     <<: *frappe
     restart: "no"
     environment:
-      SITE_NAME: ${SITE_NAME:?SITE_NAME fehlt}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD fehlt}
-      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD fehlt}
+      SITE_NAME: ${SITE_NAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       INSTALL_APPS: ${INSTALL_APPS:-erpnext}
     entrypoint: ["bash", "-c"]
     command:
       - >
         set -e;
+        for v in SITE_NAME ADMIN_PASSWORD DB_ROOT_PASSWORD; do
+          eval "val=\$$$$v";
+          if [ -z "$$val" ]; then echo "FEHLER: $$v ist nicht gesetzt (Coolify -> Environment Variables)"; exit 1; fi;
+        done;
         wait-for-it -t 180 db:3306;
         wait-for-it -t 180 redis-cache:6379;
         wait-for-it -t 180 redis-queue:6379;
@@ -166,7 +175,7 @@ services:
     environment:
       BACKEND: backend:8000
       SOCKETIO: websocket:9000
-      FRAPPE_SITE_NAME_HEADER: ${SITE_NAME:?SITE_NAME fehlt}
+      FRAPPE_SITE_NAME_HEADER: ${SITE_NAME}
       UPSTREAM_REAL_IP_ADDRESS: ${UPSTREAM_REAL_IP_ADDRESS:-10.0.0.100}
       UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
       UPSTREAM_REAL_IP_RECURSIVE: "off"
