@@ -1,0 +1,192 @@
+# ERPNext für die Fachschaft Informatik e.V.
+# Deployment: Coolify -> Application -> Build Pack "Docker Compose", Quelle = dieses Repo.
+# Ingress: Port wird auf den Host veröffentlicht, Routing macht NPMplus auf rammstein.
+#
+# Das Image ist bewusst auf eine exakte Version gepinnt (kein :latest).
+# Siehe README.md -> "Warum kein latest".
+
+x-frappe: &frappe
+  image: "${FRAPPE_IMAGE:-frappe/erpnext}:${FRAPPE_VERSION:-v16.35.0}"
+  restart: unless-stopped
+  networks: [frappe]
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - logs:/home/frappe/frappe-bench/logs
+
+services:
+
+  # ---------------------------------------------------------------- Datenbank
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    networks: [frappe]
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --innodb-buffer-pool-size=256M
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD fehlt}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 15s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 640m
+
+  redis-cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [frappe]
+    mem_limit: 96m
+
+  redis-queue:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [frappe]
+    volumes:
+      - redis-queue-data:/data
+    mem_limit: 96m
+
+  # ------------------------------------------------- Einmalige Initialisierung
+  # Schreibt common_site_config.json. Laeuft bei jedem Deploy, ist idempotent.
+  configurator:
+    <<: *frappe
+    restart: "no"
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host db;
+        bench set-config -gp db_port 3306;
+        bench set-config -g redis_cache "redis://redis-cache:6379";
+        bench set-config -g redis_queue "redis://redis-queue:6379";
+        bench set-config -g redis_socketio "redis://redis-queue:6379";
+        bench set-config -gp socketio_port 9000;
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 512m
+
+  # Legt die Site an. Existiert sie schon, passiert nichts (idempotent).
+  # Das ist exakt das Muster, das lan-homepage/nak-lan.de mit "migrate" fährt:
+  # restart: "no" + depends_on: service_completed_successfully.
+  create-site:
+    <<: *frappe
+    restart: "no"
+    environment:
+      SITE_NAME: ${SITE_NAME:?SITE_NAME fehlt}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD fehlt}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD fehlt}
+      INSTALL_APPS: ${INSTALL_APPS:-erpnext}
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        set -e;
+        wait-for-it -t 180 db:3306;
+        wait-for-it -t 180 redis-cache:6379;
+        wait-for-it -t 180 redis-queue:6379;
+        start=$$(date +%s);
+        until [ -n "$$(jq -r '.db_host // empty' sites/common_site_config.json 2>/dev/null)" ] &&
+              [ -n "$$(jq -r '.redis_cache // empty' sites/common_site_config.json 2>/dev/null)" ] &&
+              [ -n "$$(jq -r '.redis_queue // empty' sites/common_site_config.json 2>/dev/null)" ]; do
+          echo "warte auf sites/common_site_config.json ...";
+          sleep 5;
+          if [ $$(( $$(date +%s) - start )) -gt 180 ]; then
+            echo "FEHLER: common_site_config.json kam nicht zustande"; exit 1;
+          fi;
+        done;
+        if [ -d "sites/$$SITE_NAME" ]; then
+          echo "Site $$SITE_NAME existiert bereits - ueberspringe Anlage.";
+        else
+          APPS_ARGS="";
+          for a in $$INSTALL_APPS; do APPS_ARGS="$$APPS_ARGS --install-app $$a"; done;
+          echo "lege Site $$SITE_NAME an mit:$$APPS_ARGS";
+          bench new-site "$$SITE_NAME" \
+            --mariadb-user-host-login-scope='%' \
+            --db-root-username=root \
+            --db-root-password="$$DB_ROOT_PASSWORD" \
+            --admin-password="$$ADMIN_PASSWORD" \
+            $$APPS_ARGS \
+            --set-default;
+        fi;
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+    mem_limit: 768m
+
+  # ------------------------------------------------------------ Anwendung
+  backend:
+    <<: *frappe
+    environment:
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+    depends_on:
+      create-site:
+        condition: service_completed_successfully
+    mem_limit: 768m
+
+  websocket:
+    <<: *frappe
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+    depends_on:
+      create-site:
+        condition: service_completed_successfully
+    mem_limit: 224m
+
+  queue-short:
+    <<: *frappe
+    command: ["bench", "worker", "--queue", "short,default"]
+    depends_on:
+      create-site:
+        condition: service_completed_successfully
+    mem_limit: 512m
+
+  queue-long:
+    <<: *frappe
+    command: ["bench", "worker", "--queue", "long,default,short"]
+    depends_on:
+      create-site:
+        condition: service_completed_successfully
+    mem_limit: 512m
+
+  scheduler:
+    <<: *frappe
+    command: ["bench", "schedule"]
+    depends_on:
+      create-site:
+        condition: service_completed_successfully
+    mem_limit: 384m
+
+  frontend:
+    <<: *frappe
+    command: ["nginx-entrypoint.sh"]
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: ${SITE_NAME:?SITE_NAME fehlt}
+      UPSTREAM_REAL_IP_ADDRESS: ${UPSTREAM_REAL_IP_ADDRESS:-10.0.0.100}
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: 180
+      CLIENT_MAX_BODY_SIZE: 100m
+    ports:
+      - "${ERPNEXT_HOST_PORT:-5010}:8080"
+    depends_on:
+      backend:
+        condition: service_started
+      websocket:
+        condition: service_started
+    mem_limit: 128m
+
+volumes:
+  sites:
+  logs:
+  db-data:
+  redis-queue-data:
+
+networks:
+  frappe:
+    driver: bridge

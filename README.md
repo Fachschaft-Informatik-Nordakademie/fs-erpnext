@@ -1,0 +1,103 @@
+# ERPNext — Buchhaltung der Fachschaft Informatik e.V.
+
+Selbstgehostete Vereinsbuchhaltung auf Basis von [ERPNext](https://erpnext.com) (GPLv3).
+Deployment über Coolify, Quelle ist dieses Repository.
+
+## Warum ERPNext
+
+Der Verein ist **nicht gemeinnützig** und liegt mit über 25.000 € Mitgliedsbeiträgen
+**über der Kleinunternehmergrenze** (§ 19 UStG, 25.000 €) — es fällt also Umsatzsteuer an,
+mit Vorsteuerabzug. Gleichzeitig soll der Gewinn je Veranstaltung und je Veranstaltungsreihe
+auswertbar sein, es sollen Belege am Vorgang hängen, und es soll mehrbenutzerfähig mit
+Authentik-Login laufen.
+
+Die schlanken Vereins-Tools scheitern an der Umsatzsteuer (die Nextcloud-App
+`vereinsbuchhaltung` sagt selbst: „kein Steuerprogramm"), JVerein ist ein Desktop-Client
+ohne OIDC. ERPNext deckt als einziges freies Werkzeug alles ab:
+
+| Anforderung | Umsetzung in ERPNext |
+|---|---|
+| Gewinn je Veranstaltung | Kostenstelle je Event |
+| Gewinn je Veranstaltungsreihe | Kostenstellen sind ein Baum — Reihe ist die Elternkostenstelle |
+| Umsatzsteuer / Vorsteuer | Steuervorlagen 19 % / 7 % / Vorsteuer |
+| Belege | Anhänge an jedem Beleg |
+| Abschreibungen | Anlagenmodul mit AfA-Plan |
+| Mehrbenutzer + SSO | Rollen + Social Login Key (OIDC) gegen Authentik |
+| Weitergabe an die Steuerberatung | DATEV-Export (optionale App, siehe unten) |
+
+Was ERPNext **nicht** kann: ELSTER. Die Umsatzsteuer-Voranmeldung wird entweder aus dem
+Bordbericht in ELSTER-Online übertragen oder per DATEV-Export an die Steuerberatung gegeben.
+Beide Wege sind vorbereitet, siehe [docs/UMSATZSTEUER.md](docs/UMSATZSTEUER.md).
+
+## Wo das läuft
+
+| | |
+|---|---|
+| Coolify | https://coolify.nak-inf.de |
+| Projekt | **Fachschaften** → Environment `production` |
+| Server | **slipknot** (VM 200, 10.0.0.200) — dort laufen auch die beiden Firefly-III-Instanzen |
+| Host-Port | `5010` (belegt auf slipknot: 3000, 5006, 5007, 5678, 8000, 9000, 9001) |
+| Ingress | NPMplus auf rammstein (10.0.0.100) → `10.0.0.200:5010` |
+| Domain | `buchhaltung.nak-inf.de` |
+
+Routing läuft wie bei den anderen Diensten auf slipknot über NPMplus, nicht über
+Coolifys Traefik — deshalb veröffentlicht der `frontend`-Service seinen Port auf den Host.
+
+## Struktur
+
+```
+docker-compose.yaml   der komplette Stack (eine Datei, Coolify-tauglich)
+.env.example          alle Variablen mit Erklärung — Werte selbst setzen in Coolify
+apps.json             App-Liste für das optionale DATEV-Image
+.github/workflows/    baut das DATEV-Image nach ghcr.io
+docs/AUTHENTIK.md     SSO-Einrichtung
+docs/UMSATZSTEUER.md  UStVA: Bordbericht-Weg und DATEV-Weg
+docs/KONTIERUNG.md    Kontenrahmen, Kostenstellen, Events und Eventreihen
+```
+
+## Der `create-site`-Trick
+
+ERPNext braucht einen einmaligen Init-Schritt (`bench new-site`), der in Coolify sonst
+als „dauerhaft ungesunder Container" auffällt. Gelöst wie bei `lan-homepage` (nak-lan.de):
+
+```yaml
+create-site:
+  restart: "no"
+  # ... legt die Site an, oder überspringt, wenn sie existiert
+backend:
+  depends_on:
+    create-site:
+      condition: service_completed_successfully
+```
+
+`create-site` läuft bei jedem Deploy, prüft `sites/<SITE_NAME>` und beendet sich mit 0,
+wenn nichts zu tun ist. Damit ist der Stack idempotent redeploybar.
+
+## Warum kein `latest`
+
+`FRAPPE_VERSION` ist auf eine exakte Version gepinnt. Ein floating `latest` hat uns bei
+Overleaf schon einen Crash-Loop beschert, weil ein Redeploy still ein neues Image zog und
+das neue Image plötzlich eine bisher nicht gesetzte Variable verlangte. Updates werden
+hier bewusst durch Ändern von `FRAPPE_VERSION` ausgelöst — **vorher Backup**, ERPNext
+migriert das Schema beim Start.
+
+## Deployment
+
+1. In Coolify: Projekt **Fachschaften** → `production` → **+ New** → **Public Repository**
+2. Repo `https://github.com/Fachschaft-Informatik-Nordakademie/fs-erpnext`, Branch `main`
+3. Build Pack: **Docker Compose**, Compose-Datei `docker-compose.yaml`
+4. Server: **slipknot**
+5. Environment Variables aus `.env.example` setzen (Passwörter frisch erzeugen:
+   `openssl rand -base64 32`)
+6. **Automatic Deployment** aktivieren — Coolify legt den GitHub-Webhook an und zieht
+   jeden Push auf `main`
+7. Deploy. Der erste Start dauert einige Minuten (`create-site` legt die Datenbank an).
+
+Danach: NPMplus-Proxy-Host auf `10.0.0.200:5010`, dann [docs/AUTHENTIK.md](docs/AUTHENTIK.md).
+
+## Backup
+
+Die MariaDB liegt im Volume `db-data`, die Belege im Volume `sites`. **Beides gehört ins
+Backup** — bei der Infra-Bestandsaufnahme am 12.09.2026 war fehlendes Backup der
+kritischste Befund. Ein Dump allein reicht nicht: ohne `sites` sind alle hochgeladenen
+Rechnungen weg.
