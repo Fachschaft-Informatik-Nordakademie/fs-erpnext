@@ -114,9 +114,29 @@ notify() {
   fi
 
   if [ -n "${BACKUP_WEBHOOK_URL:-}" ] && [ "$ok" = "0" ]; then
-    local payload
-    payload=$(printf '{"content":"**ERPNext-Backup fehlgeschlagen** (%s)\\nSchritt: %s\\nHost: %s\\nZeit: %s"}' \
-              "$SITE" "$text" "$(hostname)" "$(date '+%F %T %Z')")
+    local payload now
+    now=$(date '+%d.%m.%Y %H:%M:%S %Z')
+    # Laut und unuebersehbar: @here-Ping plus roter Embed. Ein stilles Backup-Problem
+    # faellt sonst erst auf, wenn man das Backup braucht - und dann ist es zu spaet.
+    payload=$(cat <<JSON
+{
+  "content": "@here 🚨🚨 **BACKUP FEHLGESCHLAGEN** 🚨🚨",
+  "allowed_mentions": { "parse": ["everyone"] },
+  "embeds": [{
+    "title": "🔴 ERPNext-Backup ist NICHT durchgelaufen",
+    "description": "Die Vereinsbuchhaltung wurde **nicht gesichert**. Solange das nicht behoben ist, gibt es keine aktuelle Sicherung der Buchhaltung und der Belege.",
+    "color": 15158332,
+    "fields": [
+      { "name": "Fehlgeschlagener Schritt", "value": "\`${text}\`", "inline": true },
+      { "name": "Site", "value": "${SITE}", "inline": true },
+      { "name": "Zeitpunkt", "value": "${now}", "inline": false },
+      { "name": "Was jetzt zu tun ist", "value": "Logs ansehen: Coolify → erpnext-fs-informatik → Service \`backup\`. Nach dem Fix laesst sich ein Lauf sofort nachholen: \`docker exec <backup-container> /usr/local/bin/run-backup.sh\`" }
+    ],
+    "footer": { "text": "Backup-Dienst · erp.nak-studis.de · Container ${HOSTNAME}" }
+  }]
+}
+JSON
+)
     local code
     code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' \
            -H 'Content-Type: application/json' -d "$payload" "${BACKUP_WEBHOOK_URL}" 2>/dev/null || echo 000)

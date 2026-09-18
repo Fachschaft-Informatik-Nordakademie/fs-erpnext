@@ -61,8 +61,8 @@ Zwei Wege, beide über eine Environment-Variable scharfgeschaltet:
 
 | Variable | wird aufgerufen | fängt ab |
 |---|---|---|
-| `BACKUP_PUSH_URL` | nur bei **Erfolg** | Uptime-Kuma-Push-Monitor: bleibt der Ping aus, schlägt Kuma von selbst Alarm — erkennt also auch „Backup lief gar nicht" |
-| `BACKUP_WEBHOOK_URL` | nur bei **Fehlschlag** | sofortige Meldung mit dem fehlgeschlagenen Schritt, z. B. als Discord-Webhook |
+| `BACKUP_PUSH_URL` | nur bei **Erfolg** | Uptime-Kuma-Push-Monitor: bleibt der Ping aus, schlägt Kuma von selbst Alarm — erkennt also auch „Backup lief gar nicht". **Noch nicht gesetzt**, weil Uptime Kuma derzeit extern läuft. Sobald eine Push-URL vorliegt: Variable setzen, Redeploy. |
+| `BACKUP_WEBHOOK_URL` | nur bei **Fehlschlag** | Discord-Webhook der Fachschaft: `@here`-Ping plus roter Embed mit fehlgeschlagenem Schritt und Handlungsanweisung |
 
 Die Kombination ist Absicht. Ein Webhook, der nur bei Fehlern feuert, ist blind für den
 häufigsten realen Fall: der Job läuft überhaupt nicht mehr, und niemand merkt es. Genau
