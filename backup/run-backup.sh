@@ -4,14 +4,18 @@
 set -uo pipefail
 
 SITE="${SITE_NAME:?SITE_NAME fehlt}"
-WORK="$(mktemp -d)"
+mkdir -p /work
+# Fester Pfad statt mktemp: restic identifiziert Snapshots ueber den Pfad.
+# Ein wechselnder Temp-Pfad kostet die Parent-Snapshot-Dedup und macht
+# Restore-Pfade bei jedem Lauf anders.
+WORK="/work"
 STATUS=0
 FAILED_STEP=""
 
 log()  { echo "[$(date '+%F %T')] $*"; }
 fail() { STATUS=1; FAILED_STEP="$1"; log "FEHLER in Schritt: $1"; }
 
-cleanup() { rm -rf "$WORK"; }
+cleanup() { rm -rf "${WORK:?}"/*; }
 trap cleanup EXIT
 
 # --------------------------------------------------------------- SSH-Schluessel

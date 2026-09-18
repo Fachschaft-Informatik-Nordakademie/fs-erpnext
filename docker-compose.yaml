@@ -228,12 +228,15 @@ services:
     volumes:
       # nur lesend - das Backup darf die Nutzdaten unter keinen Umstaenden veraendern
       - sites:/sites:ro
+      # Arbeitsverzeichnis fuer Dump + Configs, fester Pfad wegen restic-Dedup
+      - backup-work:/work
     depends_on:
       db:
         condition: service_healthy
     mem_limit: 256m
 
 volumes:
+  backup-work:
   sites:
   logs:
   db-data:
