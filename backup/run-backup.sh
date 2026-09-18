@@ -101,16 +101,25 @@ notify() {
   # Uptime-Kuma-Push oder beliebiger Webhook: nur bei Erfolg pingen,
   # damit Kuma ein ausgebliebenes Backup selbst als Ausfall erkennt.
   if [ -n "${BACKUP_PUSH_URL:-}" ] && [ "$ok" = "1" ]; then
-    curl -fsS -m 20 "${BACKUP_PUSH_URL}" >/dev/null 2>&1 \
-      && log "Push-Ping gesendet" || log "Push-Ping fehlgeschlagen"
+    local pcode
+    pcode=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${BACKUP_PUSH_URL}" 2>/dev/null || echo 000)
+    case "$pcode" in
+      2*) log "Push-Ping gesendet (HTTP $pcode)" ;;
+      *)  log "Push-Ping nicht zustellbar (HTTP $pcode)" ;;
+    esac
   fi
 
   if [ -n "${BACKUP_WEBHOOK_URL:-}" ] && [ "$ok" = "0" ]; then
     local payload
     payload=$(printf '{"content":"**ERPNext-Backup fehlgeschlagen** (%s)\\nSchritt: %s\\nHost: %s\\nZeit: %s"}' \
               "$SITE" "$text" "$(hostname)" "$(date '+%F %T %Z')")
-    curl -fsS -m 20 -H 'Content-Type: application/json' -d "$payload" "${BACKUP_WEBHOOK_URL}" >/dev/null 2>&1 \
-      && log "Fehler-Webhook gesendet" || log "Fehler-Webhook fehlgeschlagen"
+    local code
+    code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' \
+           -H 'Content-Type: application/json' -d "$payload" "${BACKUP_WEBHOOK_URL}" 2>/dev/null || echo 000)
+    case "$code" in
+      2*) log "Fehler-Webhook gesendet (HTTP $code)" ;;
+      *)  log "Fehler-Webhook nicht zustellbar (HTTP $code)" ;;
+    esac
   fi
 }
 
