@@ -101,7 +101,17 @@ in einen laufenden Container legen, sie müssen ins Image.
 
 Gebaut wird über `.github/workflows/build-image.yml` — der Workflow läuft automatisch bei
 jeder Änderung an `apps.json` und ist auch von Hand startbar. Das Ergebnis bekommt zwei
-Tags: die ERPNext-Version (`v16.35.0`) und den Commit-SHA.
+Tags: die ERPNext-Version (`v16.35.0`) und den Commit-SHA. **In Coolify steht der SHA**,
+denn den Versions-Tag schiebt jeder neue Build weiter, der SHA-Tag nicht.
+
+`apps.json` reicht frappe_docker als **Build-Secret** herein (`secret-files: apps_json=apps.json`),
+nicht als Build-Arg `APPS_JSON_BASE64` — das wertet `images/layered/Containerfile` nicht
+mehr aus. Wird das verwechselt, läuft der Build ohne Fehlermeldung durch und das Image
+enthält am Ende nur `frappe`. Ein Blick nach dem Bau lohnt sich deshalb:
+
+```bash
+docker run --rm --entrypoint bash <image> -c 'ls -1 /home/frappe/frappe-bench/apps'
+```
 
 **Eine neue App aufnehmen:** Eintrag in `apps.json`, pushen, Workflow abwarten, dann auf
 der laufenden Site nachinstallieren:
