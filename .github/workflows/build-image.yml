@@ -47,7 +47,6 @@ jobs:
           echo "owner=${owner,,}" >> "$GITHUB_OUTPUT"
           echo "frappe_branch=${{ inputs.frappe_branch || env.DEFAULT_FRAPPE_BRANCH }}" >> "$GITHUB_OUTPUT"
           echo "image_tag=${{ inputs.image_tag || env.DEFAULT_IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
-          echo "apps_b64=$(base64 -w 0 apps.json)" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -72,7 +71,13 @@ jobs:
           build-args: |
             FRAPPE_PATH=https://github.com/frappe/frappe
             FRAPPE_BRANCH=${{ steps.vars.outputs.frappe_branch }}
-            APPS_JSON_BASE64=${{ steps.vars.outputs.apps_b64 }}
+          # frappe_docker nimmt apps.json inzwischen als Build-SECRET entgegen
+          # (--mount=type=secret,id=apps_json), nicht mehr als Build-Arg
+          # APPS_JSON_BASE64. Wird das falsch uebergeben, laeuft der Build ohne
+          # Fehlermeldung durch und das Image enthaelt nur frappe -- genau das
+          # ist uns am 18.09.2026 passiert.
+          secret-files: |
+            apps_json=apps.json
 
       - name: Ergebnis
         run: |
