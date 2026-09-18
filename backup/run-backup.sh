@@ -44,15 +44,18 @@ dump_db() {
   db_name=$(grep -o '"db_name"[^,]*' "$cfg" | cut -d'"' -f4)
   [ -n "$db_name" ] || { fail "db_name nicht lesbar"; return 1; }
   log "Dumpe Datenbank ${db_name} ..."
+  # Bewusst UNKOMPRIMIERT: restic dedupliziert und komprimiert selbst. Ein gzip-Dump
+  # sieht nach jeder Aenderung byteweise voellig anders aus - dann legt jeder Lauf
+  # den kompletten Dump neu ab statt nur die Aenderungen. Unkomprimiert wachsen die
+  # Snapshots mit dem tatsaechlichen Delta.
   mariadb-dump \
       --host="${DB_HOST:-db}" --user=root --password="${DB_ROOT_PASSWORD}" \
       --single-transaction --quick --routines --events \
       --default-character-set=utf8mb4 \
       --databases "$db_name" \
-    | gzip -6 > "${WORK}/${SITE}-database.sql.gz"
-  # PIPESTATUS[0] = mariadb-dump, nicht gzip
-  if [ "${PIPESTATUS[0]}" -ne 0 ]; then fail "mariadb-dump"; return 1; fi
-  log "Dump fertig: $(du -h "${WORK}/${SITE}-database.sql.gz" | cut -f1)"
+    > "${WORK}/${SITE}-database.sql"
+  if [ "$?" -ne 0 ]; then fail "mariadb-dump"; return 1; fi
+  log "Dump fertig: $(du -h "${WORK}/${SITE}-database.sql" | cut -f1) (unkomprimiert, restic komprimiert)"
 }
 
 # ------------------------------------------- site_config sichern (Encryption Key!)
@@ -75,6 +78,7 @@ run_restic() {
 
   log "[$label] sichere Dump + Dateien ..."
   restic backup \
+      --compression auto \
       --host "erpnext-${SITE}" \
       --tag erpnext --tag "$label" \
       "$WORK" \

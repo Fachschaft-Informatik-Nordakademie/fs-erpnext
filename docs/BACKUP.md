@@ -8,7 +8,7 @@ zieht damit mit, wenn der Stack umzieht.
 
 | | warum |
 |---|---|
-| Datenbank-Dump (`mariadb-dump --single-transaction`) | die eigentliche Buchhaltung |
+| Datenbank-Dump (`mariadb-dump --single-transaction`, unkomprimiert) | die eigentliche Buchhaltung |
 | `private/files` und `public/files` der Site | **die hochgeladenen Belege** |
 | `site_config.json` + `common_site_config.json` | enthält den `encryption_key` — ohne ihn sind gespeicherte Passwörter und OAuth-Secrets nach einem Restore unbrauchbar |
 
@@ -44,6 +44,11 @@ OFFSITE_SECRET_ACCESS_KEY=...
 
 Bei einem SFTP-Ziel muss der öffentliche Schlüssel aus `BACKUP_SSH_KEY_B64` dort
 hinterlegt werden. Das gleiche restic-Passwort wird für beide Repos verwendet.
+
+Der Dump wird bewusst **unkomprimiert** abgelegt und restic überlassen. Ein gzip-Dump
+sieht nach jeder noch so kleinen Änderung byteweise komplett anders aus — dann legt jeder
+Lauf den ganzen Dump neu ab. Unkomprimiert greift restics Deduplizierung, und ein
+täglicher Snapshot kostet nur noch das echte Delta statt jedes Mal die volle Dumpgröße.
 
 Warum restic und nicht einfach `scp` einer `.sql.gz`: Versionierung mit
 Deduplizierung (14 Tage / 8 Wochen / 12 Monate passen in wenige hundert MB),
