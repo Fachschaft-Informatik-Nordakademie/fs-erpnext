@@ -55,6 +55,7 @@ apps.json             welche Apps ins Image gebaut werden (gepinnte Versionen)
 .github/workflows/    baut das Image nach ghcr.io
 docs/AUTHENTIK.md     SSO-Einrichtung
 docs/MAIL.md          Mailversand über erp@nak-studis.de
+docs/DEUTSCHE-APPS.md erpnext_germany und eu_einvoice: was sie können, was noch fehlt
 docs/UMSATZSTEUER.md  UStVA: Bordbericht-Weg und DATEV-Weg
 docs/KONTIERUNG.md    Kontenrahmen, Kostenstellen, Events und Eventreihen
 ```
