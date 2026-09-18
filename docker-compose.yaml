@@ -18,8 +18,13 @@ x-frappe: &frappe
   # oeffentliche IP aufloest, laeuft ins Leere. Der OIDC-Token-Tausch passiert aber
   # server-zu-server aus dem backend-Container heraus. Deshalb der Kurzschluss auf
   # NPMplus im LAN - TLS bleibt gueltig, weil NPMplus per SNI dasselbe Zertifikat liefert.
+  # Derselbe Grund gilt fuer den Mailserver: ERPNext verschickt Rechnungen und
+  # Mahnungen per SMTP ueber mx.stupanak.de (Mailcow auf acdc). Der Hostname
+  # bleibt stehen, damit die TLS-Pruefung greift (das Zertifikat traegt
+  # mx.stupanak.de), zeigt aber auf die LAN-Adresse.
   extra_hosts:
     - "portal.nak-studis.de:${AUTHENTIK_LAN_IP:-10.0.0.100}"
+    - "mx.stupanak.de:${MAILCOW_LAN_IP:-10.0.0.202}"
   volumes:
     - sites:/home/frappe/frappe-bench/sites
     - logs:/home/frappe/frappe-bench/logs

@@ -23,7 +23,10 @@ ohne OIDC. ERPNext deckt als einziges freies Werkzeug alles ab:
 | Belege | Anhänge an jedem Beleg |
 | Abschreibungen | Anlagenmodul mit AfA-Plan |
 | Mehrbenutzer + SSO | Rollen + Social Login Key (OIDC) gegen Authentik |
-| Weitergabe an die Steuerberatung | DATEV-Export (optionale App, siehe unten) |
+| Weitergabe an die Steuerberatung | DATEV-Export (`erpnext_datev`, im Image enthalten) |
+| Rechnungen und Mahnungen verschicken | eigenes Postfach `erp@nak-studis.de`, siehe [docs/MAIL.md](docs/MAIL.md) |
+| Deutsche Pflichten | `erpnext_germany`: lückenlose Nummernkreise, Löschschutz für Anhänge an gebuchten Belegen, Summen- und Saldenliste, GDPdU-Export für die Betriebsprüfung |
+| E-Rechnung | `eu_einvoice`: XRechnung/ZUGFeRD empfangen und erstellen — seit 01.01.2025 muss der Verein als Unternehmer E-Rechnungen empfangen können |
 
 Was ERPNext **nicht** kann: ELSTER. Die Umsatzsteuer-Voranmeldung wird entweder aus dem
 Bordbericht in ELSTER-Online übertragen oder per DATEV-Export an die Steuerberatung gegeben.
@@ -48,9 +51,10 @@ Coolifys Traefik — deshalb veröffentlicht der `frontend`-Service seinen Port 
 ```
 docker-compose.yaml   der komplette Stack (eine Datei, Coolify-tauglich)
 .env.example          alle Variablen mit Erklärung — Werte selbst setzen in Coolify
-apps.json             App-Liste für das optionale DATEV-Image
-.github/workflows/    baut das DATEV-Image nach ghcr.io
+apps.json             welche Apps ins Image gebaut werden (gepinnte Versionen)
+.github/workflows/    baut das Image nach ghcr.io
 docs/AUTHENTIK.md     SSO-Einrichtung
+docs/MAIL.md          Mailversand über erp@nak-studis.de
 docs/UMSATZSTEUER.md  UStVA: Bordbericht-Weg und DATEV-Weg
 docs/KONTIERUNG.md    Kontenrahmen, Kostenstellen, Events und Eventreihen
 ```
@@ -86,13 +90,35 @@ wenn nichts zu tun ist. Damit ist der Stack idempotent redeploybar.
    `is_build_time` gibt 422 — nur `{key, value}` senden. PATCH aktualisiert, POST legt
    sonst stille Duplikate an.
 
+## Das Image
+
+Die Instanz läuft **nicht** auf `frappe/erpnext`, sondern auf einem selbstgebauten Image
+`ghcr.io/fachschaft-informatik-nordakademie/fs-erpnext`. Grund: ERPNext allein reicht
+nicht, es braucht drei Zusatz-Apps von [ALYF](https://github.com/alyf-de) —
+`erpnext_germany` (deutsche Pflichten), `eu_einvoice` (XRechnung/ZUGFeRD) und
+`erpnext_datev` (Export an die Steuerberatung). Frappe-Apps lassen sich nicht nachträglich
+in einen laufenden Container legen, sie müssen ins Image.
+
+Gebaut wird über `.github/workflows/build-image.yml` — der Workflow läuft automatisch bei
+jeder Änderung an `apps.json` und ist auch von Hand startbar. Das Ergebnis bekommt zwei
+Tags: die ERPNext-Version (`v16.35.0`) und den Commit-SHA.
+
+**Eine neue App aufnehmen:** Eintrag in `apps.json`, pushen, Workflow abwarten, dann auf
+der laufenden Site nachinstallieren:
+
+```bash
+bench --site erp.nak-studis.de install-app <app>
+```
+
 ## Warum kein `latest`
 
-`FRAPPE_VERSION` ist auf eine exakte Version gepinnt. Ein floating `latest` hat uns bei
-Overleaf schon einen Crash-Loop beschert, weil ein Redeploy still ein neues Image zog und
-das neue Image plötzlich eine bisher nicht gesetzte Variable verlangte. Updates werden
-hier bewusst durch Ändern von `FRAPPE_VERSION` ausgelöst — **vorher Backup**, ERPNext
-migriert das Schema beim Start.
+`FRAPPE_VERSION` ist auf eine exakte Version gepinnt, und `apps.json` ebenso: dort steht
+der ERPNext-Tag, im Workflow der passende Frappe-Tag. Frappe und ERPNext haben eigene
+Patch-Nummern — Stand 18.09.2026 laufen `frappe v16.34.0` und `erpnext v16.35.0`
+zusammen. Ein floating `latest` hat uns bei Overleaf schon einen Crash-Loop beschert,
+weil ein Redeploy still ein neues Image zog und das neue Image plötzlich eine bisher
+nicht gesetzte Variable verlangte. Updates werden hier bewusst durch Ändern dieser drei
+Stellen ausgelöst — **vorher Backup**, ERPNext migriert das Schema beim Start.
 
 ## Deployment
 
