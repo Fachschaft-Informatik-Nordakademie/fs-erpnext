@@ -196,6 +196,43 @@ services:
         condition: service_started
     mem_limit: 128m
 
+  # ------------------------------------------------------------------ Backup
+  # Taeglicher Dump + Dateien -> restic-Repo auf rammstein (SFTP), optional
+  # zusaetzlich in ein Offsite-Repo. Zeitplan lebt im Container, nicht auf dem Host.
+  backup:
+    build:
+      context: ./backup
+    image: fs-erpnext-backup:local
+    restart: unless-stopped
+    networks: [frappe]
+    environment:
+      SITE_NAME: ${SITE_NAME}
+      DB_HOST: db
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_MINUTE: ${BACKUP_MINUTE:-15}
+      BACKUP_RUN_ON_START: ${BACKUP_RUN_ON_START:-0}
+      BACKUP_SSH_KEY_B64: ${BACKUP_SSH_KEY_B64:-}
+      BACKUP_SSH_HOST: ${BACKUP_SSH_HOST:-10.0.0.100}
+      BACKUP_SSH_USER: ${BACKUP_SSH_USER:-root}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      RESTIC_REPOSITORY_PRIMARY: ${RESTIC_REPOSITORY_PRIMARY:-sftp:backup-target:/data/backups/erpnext/repo}
+      RESTIC_REPOSITORY_OFFSITE: ${RESTIC_REPOSITORY_OFFSITE:-}
+      AWS_ACCESS_KEY_ID: ${OFFSITE_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${OFFSITE_SECRET_ACCESS_KEY:-}
+      KEEP_DAILY: ${KEEP_DAILY:-14}
+      KEEP_WEEKLY: ${KEEP_WEEKLY:-8}
+      KEEP_MONTHLY: ${KEEP_MONTHLY:-12}
+      BACKUP_PUSH_URL: ${BACKUP_PUSH_URL:-}
+      BACKUP_WEBHOOK_URL: ${BACKUP_WEBHOOK_URL:-}
+    volumes:
+      # nur lesend - das Backup darf die Nutzdaten unter keinen Umstaenden veraendern
+      - sites:/sites:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 256m
+
 volumes:
   sites:
   logs:
