@@ -5,6 +5,14 @@ set -u
 HOUR="${BACKUP_HOUR:-3}"
 MIN="${BACKUP_MINUTE:-15}"
 
+# BACKUP_SCHEDULE=external: Zeitplan und Alarmierung liegen im Container
+# infrastructure-scripts (Job erpnext-backup, ruft run-backup.sh per docker exec auf).
+# Der Sidecar bleibt dann nur als Laufzeitumgebung (restic, mariadb-client, SSH-Key) stehen.
+if [ "${BACKUP_SCHEDULE:-internal}" = "external" ]; then
+  echo "[loop] BACKUP_SCHEDULE=external -> kein eigener Zeitplan, Laeufe kommen von infrastructure-scripts."
+  exec sleep infinity
+fi
+
 echo "[loop] Backup-Dienst gestartet. Taeglicher Lauf um ${HOUR}:$(printf '%02d' "$MIN") ${TZ}."
 
 if [ "${BACKUP_RUN_ON_START:-0}" = "1" ]; then
