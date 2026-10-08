@@ -57,6 +57,9 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     networks: [frappe]
+    # named volume: the image declares VOLUME /data, so without it every redeploy left an
+    # anonymous volume behind (14 by 08.10.2026)
+    volumes: [redis-cache-data:/data]
     mem_limit: 96m
 
   redis-queue:
@@ -247,6 +250,7 @@ volumes:
   logs:
   db-data:
   redis-queue-data:
+  redis-cache-data:
 
 networks:
   frappe:
