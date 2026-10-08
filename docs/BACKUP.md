@@ -57,12 +57,13 @@ Verschlüsselung am Client — auf rammstein liegt nichts im Klartext — und ei
 
 ## Benachrichtigung bei Fehlschlag
 
-Zwei Wege, beide über eine Environment-Variable scharfgeschaltet:
+Drei Wege, jeweils über eine Environment-Variable scharfgeschaltet (Code: `backup/notify.sh`, Tests: `bash tests/test_notify.sh`):
 
 | Variable | wird aufgerufen | fängt ab |
 |---|---|---|
 | `BACKUP_PUSH_URL` | nur bei **Erfolg** | Uptime-Kuma-Push-Monitor: bleibt der Ping aus, schlägt Kuma von selbst Alarm — erkennt also auch „Backup lief gar nicht". **Noch nicht gesetzt**, weil Uptime Kuma derzeit extern läuft. Sobald eine Push-URL vorliegt: Variable setzen, Redeploy. |
-| `BACKUP_WEBHOOK_URL` | nur bei **Fehlschlag** | Discord-Webhook der Fachschaft: `@here`-Ping plus roter Embed mit fehlgeschlagenem Schritt und Handlungsanweisung |
+| `BACKUP_ALERT_URL` | bei **Fehlschlag** (firing) und **Erfolg** (resolved) | Alerts-Manager von infrastructure-scripts (`http://10.0.0.100:8781/relay/alert/<secret>`, Secret im Vault "Coolify Relay Secret (infrastructure-scripts)"). Fehlschlag = offener Alert in 🗄️-notifications mit `@here` (critical), Erfolg = die Nachricht verschwindet. Seit 08.10.2026 gesetzt, mit `BACKUP_ALERT_SOURCE=infrastructure-scripts` und `BACKUP_ALERT_KEY=job:erpnext-backup`: der Lauf wird von infrastructure-scripts geplant (`BACKUP_SCHEDULE=external`, Job `erpnext-backup`), und mit demselben Key ergeben Sidecar-Meldung und Job-Alert **eine** Discord-Nachricht mit einem Ping. |
+| `BACKUP_WEBHOOK_URL` | nur bei **Fehlschlag**, und nur wenn `BACKUP_ALERT_URL` leer oder der Manager nicht erreichbar ist | Discord-Webhook der Fachschaft direkt: `@here`-Ping plus roter Embed (Fallback, fail open) |
 
 Die Kombination ist Absicht. Ein Webhook, der nur bei Fehlern feuert, ist blind für den
 häufigsten realen Fall: der Job läuft überhaupt nicht mehr, und niemand merkt es. Genau

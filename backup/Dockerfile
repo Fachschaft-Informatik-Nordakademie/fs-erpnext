@@ -12,6 +12,7 @@ RUN apk add --no-cache \
 
 ENV TZ=Europe/Berlin
 COPY run-backup.sh /usr/local/bin/run-backup.sh
+COPY notify.sh     /usr/local/bin/notify.sh
 COPY loop.sh        /usr/local/bin/loop.sh
 RUN chmod +x /usr/local/bin/run-backup.sh /usr/local/bin/loop.sh
 

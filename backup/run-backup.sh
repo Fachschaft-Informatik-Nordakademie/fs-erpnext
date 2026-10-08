@@ -100,52 +100,8 @@ run_restic() {
 }
 
 # ----------------------------------------------------------------- Benachrichtigung
-notify() {
-  local ok="$1" text="$2"
-  # Uptime-Kuma-Push oder beliebiger Webhook: nur bei Erfolg pingen,
-  # damit Kuma ein ausgebliebenes Backup selbst als Ausfall erkennt.
-  if [ -n "${BACKUP_PUSH_URL:-}" ] && [ "$ok" = "1" ]; then
-    local pcode
-    pcode=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${BACKUP_PUSH_URL}" 2>/dev/null || echo 000)
-    case "$pcode" in
-      2*) log "Push-Ping gesendet (HTTP $pcode)" ;;
-      *)  log "Push-Ping nicht zustellbar (HTTP $pcode)" ;;
-    esac
-  fi
-
-  if [ -n "${BACKUP_WEBHOOK_URL:-}" ] && [ "$ok" = "0" ]; then
-    local payload now
-    now=$(date '+%d.%m.%Y %H:%M:%S %Z')
-    # Laut und unuebersehbar: @here-Ping plus roter Embed. Ein stilles Backup-Problem
-    # faellt sonst erst auf, wenn man das Backup braucht - und dann ist es zu spaet.
-    payload=$(cat <<JSON
-{
-  "content": "@here 🚨🚨 **BACKUP FEHLGESCHLAGEN** 🚨🚨",
-  "allowed_mentions": { "parse": ["everyone"] },
-  "embeds": [{
-    "title": "🔴 ERPNext-Backup ist NICHT durchgelaufen",
-    "description": "Die Vereinsbuchhaltung wurde **nicht gesichert**. Solange das nicht behoben ist, gibt es keine aktuelle Sicherung der Buchhaltung und der Belege.",
-    "color": 15158332,
-    "fields": [
-      { "name": "Fehlgeschlagener Schritt", "value": "\`${text}\`", "inline": true },
-      { "name": "Site", "value": "${SITE}", "inline": true },
-      { "name": "Zeitpunkt", "value": "${now}", "inline": false },
-      { "name": "Was jetzt zu tun ist", "value": "Logs ansehen: Coolify → erpnext-fs-informatik → Service \`backup\`. Nach dem Fix laesst sich ein Lauf sofort nachholen: \`docker exec <backup-container> /usr/local/bin/run-backup.sh\`" }
-    ],
-    "footer": { "text": "Backup-Dienst · erp.nak-studis.de · Container ${HOSTNAME}" }
-  }]
-}
-JSON
-)
-    local code
-    code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' \
-           -H 'Content-Type: application/json' -d "$payload" "${BACKUP_WEBHOOK_URL}" 2>/dev/null || echo 000)
-    case "$code" in
-      2*) log "Fehler-Webhook gesendet (HTTP $code)" ;;
-      *)  log "Fehler-Webhook nicht zustellbar (HTTP $code)" ;;
-    esac
-  fi
-}
+# notify <ok> <schritt>: Push-Ping, Alerts-Manager, Discord-Fallback (siehe notify.sh)
+source "$(dirname "$0")/notify.sh"
 
 # ------------------------------------------------------------------------ Ablauf
 log "=== Backup-Lauf fuer ${SITE} startet ==="

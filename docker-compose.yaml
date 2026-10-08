@@ -234,6 +234,9 @@ services:
       KEEP_MONTHLY: ${KEEP_MONTHLY:-12}
       BACKUP_PUSH_URL: ${BACKUP_PUSH_URL:-}
       BACKUP_WEBHOOK_URL: ${BACKUP_WEBHOOK_URL:-}
+      BACKUP_ALERT_URL: ${BACKUP_ALERT_URL:-}          # Alerts-Manager: http://10.0.0.100:8781/relay/alert/<secret>
+      BACKUP_ALERT_SOURCE: ${BACKUP_ALERT_SOURCE:-erpnext}
+      BACKUP_ALERT_KEY: ${BACKUP_ALERT_KEY:-backup}
     volumes:
       # nur lesend - das Backup darf die Nutzdaten unter keinen Umstaenden veraendern
       - sites:/sites:ro
