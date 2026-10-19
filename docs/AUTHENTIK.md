@@ -91,7 +91,7 @@ oder die OIDC-Konfiguration kaputtgeht, kommt *niemand* mehr über den Browser r
 auch der `Administrator` nicht. Wiederherstellung dann über den Container:
 
 ```bash
-# auf slipknot (10.0.0.200), Root-Shell dort ist fish -> Skript ueber bash -s
+# auf slipknot (10.0.0.200), Root-Shell dort ist fish -> Skript über bash -s
 CT=$(docker ps --filter name=backend-vlypchwxzmqzlzyznd3ovf0m -q | head -1)
 docker exec "$CT" bench --site erp.nak-studis.de \
   set-config -p disable_user_pass_login 0

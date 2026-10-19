@@ -1,7 +1,7 @@
-# Backup-Container fuer den ERPNext-Stack.
+# Backup-Container für den ERPNext-Stack.
 # Bewusst schlank (Alpine statt des 2-GB-Frappe-Images): er braucht nur einen
-# MariaDB-Client fuer den Dump, restic fuer Versionierung/Verschluesselung und
-# einen SSH-Client fuer das SFTP-Ziel auf rammstein.
+# MariaDB-Client für den Dump, restic für Versionierung/Verschlüsselung und
+# einen SSH-Client für das SFTP-Ziel auf rammstein.
 FROM alpine:3.22
 
 RUN apk add --no-cache \

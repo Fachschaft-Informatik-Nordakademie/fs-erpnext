@@ -5,7 +5,7 @@ set -uo pipefail
 
 SITE="${SITE_NAME:?SITE_NAME fehlt}"
 mkdir -p /work
-# Fester Pfad statt mktemp: restic identifiziert Snapshots ueber den Pfad.
+# Fester Pfad statt mktemp: restic identifiziert Snapshots über den Pfad.
 # Ein wechselnder Temp-Pfad kostet die Parent-Snapshot-Dedup und macht
 # Restore-Pfade bei jedem Lauf anders.
 WORK="/work"
@@ -18,7 +18,7 @@ fail() { STATUS=1; FAILED_STEP="$1"; log "FEHLER in Schritt: $1"; }
 cleanup() { rm -rf "${WORK:?}"/*; }
 trap cleanup EXIT
 
-# --------------------------------------------------------------- SSH-Schluessel
+# --------------------------------------------------------------- SSH-Schlüssel
 setup_ssh() {
   mkdir -p /root/.ssh && chmod 700 /root/.ssh
   if [ -n "${BACKUP_SSH_KEY_B64:-}" ]; then
@@ -45,9 +45,9 @@ dump_db() {
   [ -n "$db_name" ] || { fail "db_name nicht lesbar"; return 1; }
   log "Dumpe Datenbank ${db_name} ..."
   # Bewusst UNKOMPRIMIERT: restic dedupliziert und komprimiert selbst. Ein gzip-Dump
-  # sieht nach jeder Aenderung byteweise voellig anders aus - dann legt jeder Lauf
-  # den kompletten Dump neu ab statt nur die Aenderungen. Unkomprimiert wachsen die
-  # Snapshots mit dem tatsaechlichen Delta.
+  # sieht nach jeder Änderung byteweise völlig anders aus - dann legt jeder Lauf
+  # den kompletten Dump neu ab statt nur die Änderungen. Unkomprimiert wachsen die
+  # Snapshots mit dem tatsächlichen Delta.
   mariadb-dump \
       --host="${DB_HOST:-db}" --user=root --password="${DB_ROOT_PASSWORD}" \
       --single-transaction --quick --routines --events \
@@ -86,7 +86,7 @@ run_restic() {
       "/sites/${SITE}/public/files" \
     || { fail "restic backup ($label)"; return 1; }
 
-  log "[$label] raeume alte Snapshots auf ..."
+  log "[$label] räume alte Snapshots auf ..."
   restic forget --prune \
       --keep-daily   "${KEEP_DAILY:-14}" \
       --keep-weekly  "${KEEP_WEEKLY:-8}" \
@@ -94,7 +94,7 @@ run_restic() {
     || { fail "restic forget ($label)"; return 1; }
 
   restic check --read-data-subset=2% >/dev/null 2>&1 \
-    || log "[$label] Hinweis: restic check meldete Auffaelligkeiten (nicht fatal)"
+    || log "[$label] Hinweis: restic check meldete Auffälligkeiten (nicht fatal)"
 
   log "[$label] fertig. Snapshots: $(restic snapshots --compact 2>/dev/null | tail -2 | head -1)"
 }
@@ -104,7 +104,7 @@ run_restic() {
 source "$(dirname "$0")/notify.sh"
 
 # ------------------------------------------------------------------------ Ablauf
-log "=== Backup-Lauf fuer ${SITE} startet ==="
+log "=== Backup-Lauf für ${SITE} startet ==="
 setup_ssh
 dump_db
 dump_config
@@ -116,7 +116,7 @@ if [ "$STATUS" -eq 0 ]; then
   if [ -n "${RESTIC_REPOSITORY_OFFSITE:-}" ]; then
     run_restic "${RESTIC_REPOSITORY_OFFSITE}" "offsite"
   else
-    log "Offsite-Repo nicht konfiguriert (RESTIC_REPOSITORY_OFFSITE leer) - uebersprungen"
+    log "Offsite-Repo nicht konfiguriert (RESTIC_REPOSITORY_OFFSITE leer) - übersprungen"
   fi
 fi
 

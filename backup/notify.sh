@@ -1,7 +1,7 @@
 #!/bin/bash
 # Benachrichtigung eines Backup-Laufs (wird von run-backup.sh gesourct; braucht log(), SITE, HOSTNAME).
 #
-#   BACKUP_PUSH_URL     nur bei Erfolg gepingt (Uptime-Kuma-Push): bleibt er aus, schlaegt Kuma selbst Alarm.
+#   BACKUP_PUSH_URL     nur bei Erfolg gepingt (Uptime-Kuma-Push): bleibt er aus, schlägt Kuma selbst Alarm.
 #   BACKUP_ALERT_URL    Alerts-Manager (infrastructure-scripts, POST /relay/alert/<secret>): Fehlschlag = offener
 #                       Alert (critical, @here), Erfolg = resolved (die Discord-Nachricht verschwindet).
 #                       BACKUP_ALERT_SOURCE/BACKUP_ALERT_KEY (Default erpnext/backup): wird der Lauf von
@@ -10,7 +10,7 @@
 #   BACKUP_WEBHOOK_URL  direkter Discord-Webhook: nur ohne BACKUP_ALERT_URL oder wenn der Alerts-Manager nicht
 #                       erreichbar ist (fail open: ein Backup-Fehler darf nie verloren gehen).
 
-json_str() {   # JSON-String-Inhalt (ohne Anfuehrungszeichen) fuer beliebigen Text
+json_str() {   # JSON-String-Inhalt (ohne Anführungszeichen) für beliebigen Text
   local s="$1"
   s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\n'/\\n}; s=${s//$'\r'/}; s=${s//$'\t'/ }
   printf '%s' "$s"
@@ -23,8 +23,8 @@ post_json() {  # post_json <url> <json> -> HTTP-Code (000 = nicht erreichbar)
 notify_discord() {
   local text now payload code
   text=$(json_str "$1"); now=$(date '+%d.%m.%Y %H:%M:%S %Z')
-  # Laut und unuebersehbar: @here-Ping plus roter Embed. Ein stilles Backup-Problem
-  # faellt sonst erst auf, wenn man das Backup braucht - und dann ist es zu spaet.
+  # Laut und unübersehbar: @here-Ping plus roter Embed. Ein stilles Backup-Problem
+  # fällt sonst erst auf, wenn man das Backup braucht - und dann ist es zu spät.
   payload=$(cat <<JSON
 {
   "content": "@here 🚨🚨 **BACKUP FEHLGESCHLAGEN** 🚨🚨",
@@ -37,7 +37,7 @@ notify_discord() {
       { "name": "Fehlgeschlagener Schritt", "value": "\`${text}\`", "inline": true },
       { "name": "Site", "value": "$(json_str "$SITE")", "inline": true },
       { "name": "Zeitpunkt", "value": "${now}", "inline": false },
-      { "name": "Was jetzt zu tun ist", "value": "Logs ansehen: Coolify → erpnext-fs-informatik → Service \`backup\`. Nach dem Fix laesst sich ein Lauf sofort nachholen: \`docker exec <backup-container> /usr/local/bin/run-backup.sh\`" }
+      { "name": "Was jetzt zu tun ist", "value": "Logs ansehen: Coolify → erpnext-fs-informatik → Service \`backup\`. Nach dem Fix lässt sich ein Lauf sofort nachholen: \`docker exec <backup-container> /usr/local/bin/run-backup.sh\`" }
     ],
     "footer": { "text": "Backup-Dienst · $(json_str "$SITE") · Container $(json_str "${HOSTNAME:-}")" }
   }]

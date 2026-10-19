@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tests fuer backup/notify.sh mit einem gefaelschten curl (nichts verlaesst den Rechner).
+# Tests für backup/notify.sh mit einem gefälschten curl (nichts verlässt den Rechner).
 #   bash tests/test_notify.sh
 set -u
 HERE=$(cd "$(dirname "$0")/.." && pwd)
@@ -50,7 +50,7 @@ check "legacy webhook on failure" 'grep -q "^https://discord/webhook" "$CALLS" &
 run 1 ""
 check "legacy: nothing on success" '[ ! -s "$CALLS" ]'
 
-# 6. Anfuehrungszeichen im Schritt zerstoeren das JSON nicht
+# 6. Anführungszeichen im Schritt zerstören das JSON nicht
 export BACKUP_ALERT_URL=http://am/relay/alert/s
 run 0 'step "x" \y'
 check "json escaping" 'cut -f2 "$CALLS" | python3 -c "import json,sys; json.loads(sys.stdin.read())"'

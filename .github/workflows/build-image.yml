@@ -5,8 +5,8 @@
 # "Warum kein latest"). FRAPPE_BRANCH muss zur erpnext-Version in apps.json
 # passen: frappe und erpnext haben eigene Patch-Nummern, laufen aber im
 # selben Minor. Stand 18.09.2026: frappe v16.34.0 / erpnext v16.35.0 --
-# genau das, was auf erp.nak-studis.de laeuft. Ein Update ist damit eine
-# bewusste Aenderung an dieser Datei + apps.json, kein stiller Image-Pull.
+# genau das, was auf erp.nak-studis.de läuft. Ein Update ist damit eine
+# bewusste Änderung an dieser Datei + apps.json, kein stiller Image-Pull.
 name: build-erpnext-image
 
 on:
@@ -42,7 +42,7 @@ jobs:
         id: vars
         run: |
           # ghcr.io akzeptiert nur kleingeschriebene Namespaces, der Org-Name
-          # hat aber Grossbuchstaben -> hier einmalig kleinschreiben.
+          # hat aber Großbuchstaben -> hier einmalig kleinschreiben.
           owner="${{ github.repository_owner }}"
           echo "owner=${owner,,}" >> "$GITHUB_OUTPUT"
           echo "frappe_branch=${{ inputs.frappe_branch || env.DEFAULT_FRAPPE_BRANCH }}" >> "$GITHUB_OUTPUT"
@@ -73,8 +73,8 @@ jobs:
             FRAPPE_BRANCH=${{ steps.vars.outputs.frappe_branch }}
           # frappe_docker nimmt apps.json inzwischen als Build-SECRET entgegen
           # (--mount=type=secret,id=apps_json), nicht mehr als Build-Arg
-          # APPS_JSON_BASE64. Wird das falsch uebergeben, laeuft der Build ohne
-          # Fehlermeldung durch und das Image enthaelt nur frappe -- genau das
+          # APPS_JSON_BASE64. Wird das falsch übergeben, läuft der Build ohne
+          # Fehlermeldung durch und das Image enthält nur frappe -- genau das
           # ist uns am 18.09.2026 passiert.
           secret-files: |
             apps_json=apps.json

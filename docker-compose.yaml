@@ -6,21 +6,21 @@
 # Siehe README.md -> "Warum kein latest".
 #
 # WICHTIG: keine ${VAR:?meldung}-Syntax verwenden. Coolify parst diese Datei beim
-# Anlegen der Ressource und uebernimmt die Fehlermeldung als Default-WERT der
+# Anlegen der Ressource und übernimmt die Fehlermeldung als Default-WERT der
 # Variable - man bekommt dann z.B. eine Site namens "SITE_NAME fehlt".
-# Pflichtvariablen werden stattdessen in create-site geprueft.
+# Pflichtvariablen werden stattdessen in create-site geprüft.
 
 x-frappe: &frappe
   image: "${FRAPPE_IMAGE:-frappe/erpnext}:${FRAPPE_VERSION:-v16.35.0}"
   restart: unless-stopped
   networks: [frappe]
-  # mango kann kein NAT-Hairpin: ein Container, der portal.nak-studis.de ueber die
-  # oeffentliche IP aufloest, laeuft ins Leere. Der OIDC-Token-Tausch passiert aber
+  # mango kann kein NAT-Hairpin: ein Container, der portal.nak-studis.de über die
+  # öffentliche IP auflöst, läuft ins Leere. Der OIDC-Token-Tausch passiert aber
   # server-zu-server aus dem backend-Container heraus. Deshalb der Kurzschluss auf
-  # NPMplus im LAN - TLS bleibt gueltig, weil NPMplus per SNI dasselbe Zertifikat liefert.
-  # Derselbe Grund gilt fuer den Mailserver: ERPNext verschickt Rechnungen und
-  # Mahnungen per SMTP ueber mx.stupanak.de (Mailcow auf acdc). Der Hostname
-  # bleibt stehen, damit die TLS-Pruefung greift (das Zertifikat traegt
+  # NPMplus im LAN - TLS bleibt gültig, weil NPMplus per SNI dasselbe Zertifikat liefert.
+  # Derselbe Grund gilt für den Mailserver: ERPNext verschickt Rechnungen und
+  # Mahnungen per SMTP über mx.stupanak.de (Mailcow auf acdc). Der Hostname
+  # bleibt stehen, damit die TLS-Prüfung greift (das Zertifikat trägt
   # mx.stupanak.de), zeigt aber auf die LAN-Adresse.
   extra_hosts:
     - "portal.nak-studis.de:${AUTHENTIK_LAN_IP:-10.0.0.100}"
@@ -71,7 +71,7 @@ services:
     mem_limit: 96m
 
   # ------------------------------------------------- Einmalige Initialisierung
-  # Schreibt common_site_config.json. Laeuft bei jedem Deploy, ist idempotent.
+  # Schreibt common_site_config.json. Läuft bei jedem Deploy, ist idempotent.
   configurator:
     <<: *frappe
     restart: "no"
@@ -123,7 +123,7 @@ services:
           fi;
         done;
         if [ -d "sites/$$SITE_NAME" ]; then
-          echo "Site $$SITE_NAME existiert bereits - ueberspringe Anlage.";
+          echo "Site $$SITE_NAME existiert bereits - überspringe Anlage.";
         else
           APPS_ARGS="";
           for a in $$INSTALL_APPS; do APPS_ARGS="$$APPS_ARGS --install-app $$a"; done;
@@ -205,8 +205,8 @@ services:
     mem_limit: 128m
 
   # ------------------------------------------------------------------ Backup
-  # Taeglicher Dump + Dateien -> restic-Repo auf rammstein (SFTP), optional
-  # zusaetzlich in ein Offsite-Repo. Zeitplan lebt im Container, nicht auf dem Host.
+  # Täglicher Dump + Dateien -> restic-Repo auf rammstein (SFTP), optional
+  # zusätzlich in ein Offsite-Repo. Zeitplan lebt im Container, nicht auf dem Host.
   backup:
     build:
       context: ./backup
@@ -238,9 +238,9 @@ services:
       BACKUP_ALERT_SOURCE: ${BACKUP_ALERT_SOURCE:-erpnext}
       BACKUP_ALERT_KEY: ${BACKUP_ALERT_KEY:-backup}
     volumes:
-      # nur lesend - das Backup darf die Nutzdaten unter keinen Umstaenden veraendern
+      # nur lesend - das Backup darf die Nutzdaten unter keinen Umständen verändern
       - sites:/sites:ro
-      # Arbeitsverzeichnis fuer Dump + Configs, fester Pfad wegen restic-Dedup
+      # Arbeitsverzeichnis für Dump + Configs, fester Pfad wegen restic-Dedup
       - backup-work:/work
     depends_on:
       db:

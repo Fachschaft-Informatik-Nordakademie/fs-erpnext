@@ -77,17 +77,17 @@ nach `/tmp/last-backup-status` im Container; die Logs stehen in Coolify unter de
 ## Wiederherstellung
 
 ```bash
-# auf slipknot (Root-Shell dort ist fish -> Skripte immer ueber bash -s)
+# auf slipknot (Root-Shell dort ist fish -> Skripte immer über bash -s)
 CT=$(docker ps --filter name=backup- -q | head -1)
 
 # Snapshots ansehen
 docker exec -e RESTIC_PASSWORD=... -e RESTIC_REPOSITORY=sftp:backup-target:/data/backups/erpnext/repo \
   "$CT" restic snapshots
 
-# gewuenschten Snapshot auspacken
+# gewünschten Snapshot auspacken
 docker exec ... "$CT" restic restore <snapshot-id> --target /restore
 
-# Datenbank zurueckspielen (im backend-Container)
+# Datenbank zurückspielen (im backend-Container)
 BCT=$(docker ps --filter name=backend- -q | head -1)
 docker exec "$BCT" bench --site erp.nak-studis.de restore /pfad/zum/dump.sql.gz
 ```
