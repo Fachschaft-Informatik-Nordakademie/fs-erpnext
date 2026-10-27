@@ -31,9 +31,6 @@ auf der Site aber noch nicht installiert (Stand 27.10.2026). Einmalig, **vorher 
 3. Export dann über den Bericht **DATEV** — erzeugt eine ZIP mit Buchungsstapel und
    Stammdaten, die die Kanzlei einliest.
 
-Wird von Anfang an mit DATEV gearbeitet, kann man sich Schritt 3 sparen: dann vor dem
-ersten Deploy `INSTALL_APPS=erpnext erpnext_datev` setzen.
-
 ## Was in beiden Fällen gilt
 
 - **Steuervorlagen** müssen sauber angelegt sein, sonst stimmt kein Bericht. Nötig sind
