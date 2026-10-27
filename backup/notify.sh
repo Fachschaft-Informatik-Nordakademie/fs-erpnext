@@ -37,7 +37,7 @@ notify_discord() {
       { "name": "Fehlgeschlagener Schritt", "value": "\`${text}\`", "inline": true },
       { "name": "Site", "value": "$(json_str "$SITE")", "inline": true },
       { "name": "Zeitpunkt", "value": "${now}", "inline": false },
-      { "name": "Was jetzt zu tun ist", "value": "Logs ansehen: Coolify → erpnext-fs-informatik → Service \`backup\`. Nach dem Fix lässt sich ein Lauf sofort nachholen: \`docker exec <backup-container> /usr/local/bin/run-backup.sh\`" }
+      { "name": "Was jetzt zu tun ist", "value": "Logs ansehen: \`kubectl -n erpnext logs job/<letzter backup-Job>\` (Repo gitops, \`apps/erpnext\`). Nach dem Fix lässt sich ein Lauf sofort nachholen: \`kubectl -n erpnext create job --from=cronjob/backup backup-manual\`" }
     ],
     "footer": { "text": "Backup-Dienst · $(json_str "$SITE") · Container $(json_str "${HOSTNAME:-}")" }
   }]
@@ -63,7 +63,7 @@ Fehlgeschlagener Schritt: $2
 Site: ${SITE}
 Zeitpunkt: ${now}
 Container: ${HOSTNAME:-}
-Logs: Coolify -> erpnext-fs-informatik -> Service backup. Lauf nachholen: docker exec <backup-container> /usr/local/bin/run-backup.sh"
+Logs: kubectl -n erpnext logs job/<letzter backup-Job>. Lauf nachholen: kubectl -n erpnext create job --from=cronjob/backup backup-manual"
   fi
   code=$(post_json "$BACKUP_ALERT_URL" "$(cat <<JSON
 {"source": "$(json_str "${BACKUP_ALERT_SOURCE:-erpnext}")", "key": "$(json_str "${BACKUP_ALERT_KEY:-backup}")",

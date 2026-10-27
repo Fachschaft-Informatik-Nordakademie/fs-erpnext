@@ -93,14 +93,29 @@ run_restic() {
       --keep-monthly "${KEEP_MONTHLY:-12}" \
     || { fail "restic forget ($label)"; return 1; }
 
-  restic check --read-data-subset=2% >/dev/null 2>&1 \
-    || log "[$label] Hinweis: restic check meldete Auffälligkeiten (nicht fatal)"
+  verify_snapshot "$label" || return 1
 
   log "[$label] fertig. Snapshots: $(restic snapshots --compact 2>/dev/null | tail -2 | head -1)"
 }
 
 # ----------------------------------------------------------------- Benachrichtigung
 # notify <ok> <schritt>: Push-Ping, Alerts-Manager, Discord-Fallback (siehe notify.sh)
+# A zero exit code of restic is not enough: the newest snapshot must hold a complete dump of
+# plausible size, and the repository structure must check out.
+verify_snapshot() {
+  local label="$1" dump="${WORK}/${SITE}-database.sql" line size
+  line=$(restic ls --long --host "erpnext-${SITE}" --tag erpnext latest 2>/dev/null | grep -F -- "$dump" | tail -n1)
+  [ -n "$line" ] || { fail "Prüfung ($label): kein Datenbank-Dump im neuesten Snapshot"; return 1; }
+  size=$(awk '{print $4}' <<<"$line")
+  [ "${size:-0}" -ge "${MIN_DUMP_BYTES:-1048576}" ] 2>/dev/null \
+    || { fail "Prüfung ($label): Datenbank-Dump zu klein (${size} Bytes)"; return 1; }
+  restic dump --host "erpnext-${SITE}" --tag erpnext latest "$dump" 2>/dev/null | tail -c 500 | grep -q 'Dump completed' \
+    || { fail "Prüfung ($label): Datenbank-Dump unvollständig"; return 1; }
+  restic check --read-data-subset=2% >/dev/null 2>&1 \
+    || { fail "Prüfung ($label): restic check"; return 1; }
+  log "[$label] geprüft: Dump ${size} Bytes, vollständig, Repository ok"
+}
+
 source "$(dirname "$0")/notify.sh"
 
 # ------------------------------------------------------------------------ Ablauf
