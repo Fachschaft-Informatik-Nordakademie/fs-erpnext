@@ -31,8 +31,8 @@ den Zugriff durch ihre Authentik-Gruppe.
 ## Netzwerkweg
 
 `mx.stupanak.de` löst öffentlich auf 94.130.19.169 auf. mango kann kein
-NAT-Hairpin, ein Container auf slipknot würde also ins Leere laufen. Deshalb
-steht in `docker-compose.yaml`:
+NAT-Hairpin für die Mail-Ports (nur 80/443 haben eins), ein Container würde also ins Leere laufen.
+Deshalb steht im Pod (`hostAliases` in `apps/erpnext/erpnext.yaml`) wie in `docker-compose.yaml`:
 
 ```yaml
 extra_hosts:

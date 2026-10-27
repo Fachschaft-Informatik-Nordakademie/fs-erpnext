@@ -1,7 +1,7 @@
 # ERPNext — Buchhaltung der Fachschaft Informatik e.V.
 
 Selbstgehostete Vereinsbuchhaltung auf Basis von [ERPNext](https://erpnext.com) (GPLv3).
-Deployment über Coolify, Quelle ist dieses Repository.
+Läuft im Kubernetes-Cluster der Fachschaft (Repo `gitops`, `apps/erpnext`); hier liegen Image und Backup.
 
 ## Warum ERPNext
 
@@ -36,21 +36,16 @@ Beide Wege sind vorbereitet, siehe [docs/UMSATZSTEUER.md](docs/UMSATZSTEUER.md).
 
 | | |
 |---|---|
-| Coolify | https://coolify.nak-inf.de |
-| Projekt | **Fachschaften** → Environment `production` |
-| Server | **slipknot** (VM 200, 10.0.0.200) — dort laufen auch die beiden Firefly-III-Instanzen |
-| Host-Port | `5010` (belegt auf slipknot: 3000, 5006, 5007, 5678, 8000, 9000, 9001) |
-| Ingress | NPMplus auf rammstein (10.0.0.100) → `10.0.0.200:5010` |
-| Domain | `erp.nak-studis.de` |
-
-Routing läuft wie bei den anderen Diensten auf slipknot über NPMplus, nicht über
-Coolifys Traefik — deshalb veröffentlicht der `frontend`-Service seinen Port auf den Host.
+| Adresse | https://erp.nak-studis.de |
+| Manifeste | Repo `gitops`, `apps/erpnext` (Namespace `erpnext`), seit 27.10.2026 |
+| Daten | Longhorn-Volumes `db-data` (MariaDB) und `sites` (Belege, Site-Konfiguration) |
 
 ## Struktur
 
 ```
-docker-compose.yaml   der komplette Stack (eine Datei, Coolify-tauglich)
-.env.example          alle Variablen mit Erklärung — Werte selbst setzen in Coolify
+docker-compose.yaml   Stack für eine lokale Instanz (früher der Coolify-Stack)
+.env.example          alle Variablen der Compose-Datei mit Erklärung
+backup/               Backup-Image (CronJob im Cluster), Tests in tests/
 apps.json             welche Apps ins Image gebaut werden (gepinnte Versionen)
 .github/workflows/    baut das Image nach ghcr.io
 docs/AUTHENTIK.md     SSO-Einrichtung
@@ -62,7 +57,7 @@ docs/KONTIERUNG.md    Kontenrahmen, Kostenstellen, Events und Eventreihen
 
 ## Der `create-site`-Trick
 
-ERPNext braucht einen einmaligen Init-Schritt (`bench new-site`), der in Coolify sonst
+In der Compose-Datei braucht ERPNext einen einmaligen Init-Schritt (`bench new-site`), der sonst
 als „dauerhaft ungesunder Container" auffällt. Gelöst wie bei `lan-homepage` (nak-lan.de):
 
 ```yaml
@@ -78,19 +73,6 @@ backend:
 `create-site` läuft bei jedem Deploy, prüft `sites/<SITE_NAME>` und beendet sich mit 0,
 wenn nichts zu tun ist. Damit ist der Stack idempotent redeploybar.
 
-## Drei Fallen, die beim Aufbau Zeit gekostet haben
-
-1. **`${VAR:?meldung}` niemals in der Compose-Datei.** Coolify parst die Datei beim
-   Anlegen der Ressource und übernimmt die *Fehlermeldung als Default-Wert*. Ergebnis
-   war eine Site namens „SITE_NAME fehlt". Pflichtfelder prüft jetzt `create-site`.
-2. **Das Docker-Netz `coolify` muss auf dem Zielserver existieren.** Coolify-*Services*
-   bekommen je ein eigenes Netz, Coolify-*Applications* nutzen das Destination-Netz
-   `coolify`. Auf slipknot gab es das nie → `network coolify not found`.
-   Fix: `docker network create --attachable coolify`.
-3. **Coolify-Env-API:** `POST /applications/{uuid}/envs` mit `is_literal`/`is_preview`/
-   `is_build_time` gibt 422 — nur `{key, value}` senden. PATCH aktualisiert, POST legt
-   sonst stille Duplikate an.
-
 ## Das Image
 
 Die Instanz läuft **nicht** auf `frappe/erpnext`, sondern auf einem selbstgebauten Image
@@ -102,7 +84,7 @@ in einen laufenden Container legen, sie müssen ins Image.
 
 Gebaut wird über `.github/workflows/build-image.yml` — der Workflow läuft automatisch bei
 jeder Änderung an `apps.json` und ist auch von Hand startbar. Das Ergebnis bekommt zwei
-Tags: die ERPNext-Version (`v16.35.0`) und den Commit-SHA. **In Coolify steht der SHA**,
+Tags: die ERPNext-Version (`v16.35.0`) und den Commit-SHA. **In `apps/erpnext/kustomization.yaml` steht der SHA**,
 denn den Versions-Tag schiebt jeder neue Build weiter, der SHA-Tag nicht.
 
 `apps.json` reicht frappe_docker als **Build-Secret** herein (`secret-files: apps_json=apps.json`),
@@ -133,17 +115,14 @@ Stellen ausgelöst — **vorher Backup**, ERPNext migriert das Schema beim Start
 
 ## Deployment
 
-1. In Coolify: Projekt **Fachschaften** → `production` → **+ New** → **Public Repository**
-2. Repo `https://github.com/Fachschaft-Informatik-Nordakademie/fs-erpnext`, Branch `main`
-3. Build Pack: **Docker Compose**, Compose-Datei `docker-compose.yaml`
-4. Server: **slipknot**
-5. Environment Variables aus `.env.example` setzen (Passwörter frisch erzeugen:
-   `openssl rand -base64 32`)
-6. **Automatic Deployment** aktivieren — Coolify legt den GitHub-Webhook an und zieht
-   jeden Push auf `main`
-7. Deploy. Der erste Start dauert einige Minuten (`create-site` legt die Datenbank an).
+Alle Frappe-Prozesse (backend, websocket, die beiden Queues, scheduler, nginx) laufen als Container
+eines Pods, weil sie sich das `sites`-Volume teilen. MariaDB, `redis-cache` und `redis-queue` sind
+eigene Deployments; ihre Service-Namen (`db`, `redis-cache`, `redis-queue`) stehen so in
+`common_site_config.json`. Eine neue Image-Version: SHA in `apps/erpnext/kustomization.yaml` eintragen,
+**vorher Backup**, nach dem Rollout `bench --site erp.nak-studis.de migrate` im backend-Container.
 
-Danach: NPMplus-Proxy-Host auf `10.0.0.200:5010`, dann [docs/AUTHENTIK.md](docs/AUTHENTIK.md).
+`docker-compose.yaml` beschreibt den früheren Coolify-Stack und dient nur noch als Vorlage für eine
+lokale Instanz.
 
 ## Backup
 

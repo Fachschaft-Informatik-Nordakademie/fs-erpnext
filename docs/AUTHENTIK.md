@@ -35,8 +35,8 @@ einloggen. Der Kreis ist klein: Vorstand, Kassenwart, Kassenprüfer.
 
 ## 2. In ERPNext
 
-Anmelden als `Administrator` (Passwort steht in den Coolify-Environment-Variables
-unter `ADMIN_PASSWORD`), dann **Integrations → Social Login Key → + New**:
+Anmelden als `Administrator` (Passwort steht in OpenBao unter `kv/erpnext/erpnext`,
+Schlüssel `ADMIN_PASSWORD`), dann **Integrations → Social Login Key → + New**:
 
 | Feld | Wert |
 |---|---|
@@ -91,15 +91,13 @@ oder die OIDC-Konfiguration kaputtgeht, kommt *niemand* mehr über den Browser r
 auch der `Administrator` nicht. Wiederherstellung dann über den Container:
 
 ```bash
-# auf slipknot (10.0.0.200), Root-Shell dort ist fish -> Skript über bash -s
-CT=$(docker ps --filter name=backend-vlypchwxzmqzlzyznd3ovf0m -q | head -1)
-docker exec "$CT" bench --site erp.nak-studis.de \
+kubectl -n erpnext exec deploy/erpnext -c backend -- bench --site erp.nak-studis.de \
   set-config -p disable_user_pass_login 0
-docker exec "$CT" bench --site erp.nak-studis.de set-admin-password '<neues-passwort>'
+kubectl -n erpnext exec -it deploy/erpnext -c backend -- bench --site erp.nak-studis.de set-admin-password
 ```
 
 Danach ist der Passwort-Login wieder da und der `Administrator` nutzbar. Sein Passwort
-steht in den Coolify-Environment-Variables unter `ADMIN_PASSWORD` und gehört zusätzlich
+steht in OpenBao unter `kv/erpnext/erpnext` (`ADMIN_PASSWORD`) und gehört zusätzlich
 in den Vaultwarden der Fachschaft.
 
 ## Rollen

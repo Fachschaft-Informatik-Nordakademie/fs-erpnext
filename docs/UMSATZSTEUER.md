@@ -22,26 +22,13 @@ Aufwand: 10–15 Minuten pro Voranmeldung. Passt, solange der Verein das selbst 
 
 ## Weg B — DATEV-Export an die Steuerberatung
 
-Dafür braucht es die App `erpnext_datev` (GPLv3, alyf-de), die **nicht** im offiziellen
-Image enthalten ist. Sie muss ins Image gebaut werden:
+Dafür braucht es die App `erpnext_datev` (GPLv3, alyf-de). Sie steckt schon im Image (`apps.json`), ist
+auf der Site aber noch nicht installiert (Stand 27.10.2026). Einmalig, **vorher Backup**:
 
-1. GitHub Actions Workflow **build-erpnext-datev-image** in diesem Repo starten
-   (Actions → Run workflow). Er baut mit `apps.json` ein Image und pusht es nach
-   `ghcr.io/fachschaft-informatik-nordakademie/fs-erpnext:version-16`.
-2. In Coolify diese zwei Variablen ändern:
-   ```
-   FRAPPE_IMAGE=ghcr.io/fachschaft-informatik-nordakademie/fs-erpnext
-   FRAPPE_VERSION=version-16
-   ```
-3. Redeploy. **Achtung:** `create-site` überspringt eine bereits existierende Site — die
-   neue App muss dann einmalig nachinstalliert werden:
-   ```
-   bench --site erp.nak-studis.de install-app erpnext_datev
-   ```
-   (im `backend`-Container ausführen)
-4. In ERPNext unter **Datev Settings** die Beraternummer und Mandantennummer eintragen,
+1. `kubectl -n erpnext exec deploy/erpnext -c backend -- bench --site erp.nak-studis.de install-app erpnext_datev`
+2. In ERPNext unter **Datev Settings** die Beraternummer und Mandantennummer eintragen,
    die die Steuerberatung liefert.
-5. Export dann über den Bericht **DATEV** — erzeugt eine ZIP mit Buchungsstapel und
+3. Export dann über den Bericht **DATEV** — erzeugt eine ZIP mit Buchungsstapel und
    Stammdaten, die die Kanzlei einliest.
 
 Wird von Anfang an mit DATEV gearbeitet, kann man sich Schritt 3 sparen: dann vor dem

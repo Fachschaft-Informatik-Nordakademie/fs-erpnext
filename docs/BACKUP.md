@@ -1,8 +1,10 @@
 # Backup
 
-Gesichert wird täglich um **03:15** (Zeitzone des Containers: Europe/Berlin), durch den
-Service `backup` im Stack selbst — kein Host-Cron, kein systemd-Timer. Der Zeitplan
-zieht damit mit, wenn der Stack umzieht.
+Gesichert wird täglich um **03:15** (Europe/Berlin) durch den CronJob `backup` im Namespace `erpnext`
+(Repo `gitops`, `apps/erpnext/backup.yaml`), mit dem Image aus `backup/` dieses Repos
+(`ghcr.io/fachschaft-informatik-nordakademie/fs-erpnext-backup`). Jeder Lauf prüft danach den neuesten
+Snapshot: Dump vorhanden, nicht winzig, vollständig, `restic check` ohne Befund. Sonst gilt der Lauf als
+fehlgeschlagen.
 
 ## Was gesichert wird
 
@@ -15,7 +17,7 @@ zieht damit mit, wenn der Stack umzieht.
 Ein reiner Datenbank-Dump reicht ausdrücklich **nicht**: ohne die `files`-Verzeichnisse
 sind alle Rechnungen und Belege weg, ohne den `encryption_key` sind die Zugangsdaten hin.
 
-Der Container mountet das `sites`-Volume **read-only**. Ein Backup darf die Nutzdaten
+Der Job mountet das `sites`-Volume **read-only**. Ein Backup darf die Nutzdaten
 unter keinen Umständen verändern.
 
 ## Wohin
@@ -31,15 +33,16 @@ command="/usr/lib/openssh/sftp-server -d /data/backups/erpnext",restrict
 Der Key kann also ausschließlich SFTP in genau diesem Verzeichnis — keine Shell, kein
 Port-Forwarding, kein Zugriff auf den Rest des Servers.
 
-**Offsite — vorbereitet, noch nicht aktiv.** Sobald ein Ziel existiert, reicht das
-Setzen von zwei bis drei Environment-Variablen in Coolify, ein Redeploy, fertig:
+**Offsite — vorbereitet, noch nicht aktiv.** Sobald ein Ziel existiert, reicht es, zwei bis drei Werte in
+OpenBao unter `kv/erpnext/backup` zu ergänzen (der Job liest das ganze Secret als Umgebung; die S3-Schlüssel
+heißen dort `AWS_ACCESS_KEY_ID` und `AWS_SECRET_ACCESS_KEY`):
 
 ```
 RESTIC_REPOSITORY_OFFSITE=sftp:u123456@u123456.your-storagebox.de:/erpnext
 # oder S3-kompatibel:
 RESTIC_REPOSITORY_OFFSITE=s3:https://s3.example.com/fs-backups/erpnext
-OFFSITE_ACCESS_KEY_ID=...
-OFFSITE_SECRET_ACCESS_KEY=...
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
 ```
 
 Bei einem SFTP-Ziel muss der öffentliche Schlüssel aus `BACKUP_SSH_KEY_B64` dort
@@ -61,8 +64,8 @@ Drei Wege, jeweils über eine Environment-Variable scharfgeschaltet (Code: `back
 
 | Variable | wird aufgerufen | fängt ab |
 |---|---|---|
-| `BACKUP_PUSH_URL` | nur bei **Erfolg** | Uptime-Kuma-Push-Monitor: bleibt der Ping aus, schlägt Kuma von selbst Alarm — erkennt also auch „Backup lief gar nicht". **Noch nicht gesetzt**, weil Uptime Kuma derzeit extern läuft. Sobald eine Push-URL vorliegt: Variable setzen, Redeploy. |
-| `BACKUP_ALERT_URL` | bei **Fehlschlag** (firing) und **Erfolg** (resolved) | Alerts-Manager von infrastructure-scripts (`http://10.0.0.100:8781/relay/alert/<secret>`, Secret im Vault "Coolify Relay Secret (infrastructure-scripts)"). Fehlschlag = offener Alert in 🗄️-notifications mit `@here` (critical), Erfolg = die Nachricht verschwindet. Seit 08.10.2026 gesetzt, mit `BACKUP_ALERT_SOURCE=infrastructure-scripts` und `BACKUP_ALERT_KEY=job:erpnext-backup`: der Lauf wird von infrastructure-scripts geplant (`BACKUP_SCHEDULE=external`, Job `erpnext-backup`), und mit demselben Key ergeben Sidecar-Meldung und Job-Alert **eine** Discord-Nachricht mit einem Ping. |
+| `BACKUP_PUSH_URL` | nur bei **Erfolg** | Uptime-Kuma-Push-Monitor: bleibt der Ping aus, schlägt Kuma von selbst Alarm — erkennt also auch „Backup lief gar nicht". **Noch nicht gesetzt.** |
+| `BACKUP_ALERT_URL` | bei **Fehlschlag** (firing) und **Erfolg** (resolved) | Alerts-Manager von infrastructure-scripts (`http://10.0.0.100:8781/relay/alert/<secret>`, Secret im Vault "Coolify Relay Secret (infrastructure-scripts)"). Fehlschlag = offener Alert in 🗄️-notifications mit `@here` (critical), Erfolg = die Nachricht verschwindet. Gesetzt mit `BACKUP_ALERT_SOURCE=infrastructure-scripts` und `BACKUP_ALERT_KEY=job:erpnext-backup`, dem Key des früheren infrastructure-scripts-Jobs, damit bestehende Alerts weiter zusammenpassen. |
 | `BACKUP_WEBHOOK_URL` | nur bei **Fehlschlag**, und nur wenn `BACKUP_ALERT_URL` leer oder der Manager nicht erreichbar ist | Discord-Webhook der Fachschaft direkt: `@here`-Ping plus roter Embed (Fallback, fail open) |
 
 Die Kombination ist Absicht. Ein Webhook, der nur bei Fehlern feuert, ist blind für den
@@ -70,27 +73,31 @@ häufigsten realen Fall: der Job läuft überhaupt nicht mehr, und niemand merkt
 das ist der Ausfallmodus, der uns bei der Bestandsaufnahme am 12.09. um ein Haar teuer
 geworden wäre.
 
-Zusätzlich beendet sich ein fehlgeschlagener Lauf mit Exit-Code 1 und schreibt den Status
-nach `/tmp/last-backup-status` im Container; die Logs stehen in Coolify unter dem Service
-`backup`.
+Zusätzlich endet ein fehlgeschlagener Lauf mit Exit-Code 1, der Job steht dann auf `Failed`. Logs:
+`kubectl -n erpnext logs job/<job>`; einen Lauf sofort nachholen:
+`kubectl -n erpnext create job --from=cronjob/backup backup-manual`.
 
 ## Wiederherstellung
 
+Ein Pod mit dem Backup-Image und allen Zugangsdaten, der nichts sichert:
+
 ```bash
-# auf slipknot (Root-Shell dort ist fish -> Skripte immer über bash -s)
-CT=$(docker ps --filter name=backup- -q | head -1)
-
-# Snapshots ansehen
-docker exec -e RESTIC_PASSWORD=... -e RESTIC_REPOSITORY=sftp:backup-target:/data/backups/erpnext/repo \
-  "$CT" restic snapshots
-
-# gewünschten Snapshot auspacken
-docker exec ... "$CT" restic restore <snapshot-id> --target /restore
-
-# Datenbank zurückspielen (im backend-Container)
-BCT=$(docker ps --filter name=backend- -q | head -1)
-docker exec "$BCT" bench --site erp.nak-studis.de restore /pfad/zum/dump.sql.gz
+kubectl -n erpnext create job --from=cronjob/backup restore --dry-run=client -o yaml > restore.yaml
+# in restore.yaml: command: [sleep, "86400"]
+kubectl apply -f restore.yaml
+kubectl -n erpnext exec -it job/restore -- bash
 ```
+
+Darin die SSH-Konfiguration so anlegen wie `setup_ssh` in `backup/run-backup.sh`, dann:
+
+```bash
+restic -r "$RESTIC_REPOSITORY_PRIMARY" snapshots
+restic -r "$RESTIC_REPOSITORY_PRIMARY" restore <snapshot-id> --target /work/restore
+```
+
+Die Datenbank spielt der backend-Container zurück:
+`kubectl -n erpnext exec -it deploy/erpnext -c backend -- bench --site erp.nak-studis.de restore <dump.sql>`.
+Danach `kubectl -n erpnext delete job restore`.
 
 Die `files`-Verzeichnisse werden anschließend zurück in das `sites`-Volume kopiert und
 `site_config.json` geprüft — insbesondere der `encryption_key`.
@@ -100,7 +107,7 @@ Wegwerf-Site gehört einmal gemacht, bevor man sich darauf verlässt.
 
 ## Das restic-Passwort
 
-`RESTIC_PASSWORD` steht in den Coolify-Environment-Variables. **Ohne dieses Passwort ist
+`RESTIC_PASSWORD` steht in OpenBao unter `kv/erpnext/backup`. **Ohne dieses Passwort ist
 kein einziges Backup wiederherstellbar** — restic verschlüsselt clientseitig, es gibt
 keine Hintertür. Es gehört zusätzlich in den Vaultwarden der Fachschaft, und zwar an eine
-Stelle, die auch dann erreichbar ist, wenn slipknot weg ist.
+Stelle, die auch dann erreichbar ist, wenn der Cluster weg ist.
